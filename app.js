@@ -42,6 +42,10 @@ const elements = {
   parentProgressFill: document.getElementById("parent-progress-fill"),
   parentResetBtn: document.getElementById("parent-reset-btn"),
   parentFeedback: document.getElementById("parent-feedback"),
+  debugAppMode: document.getElementById("debug-app-mode"),
+  debugTranscribedText: document.getElementById("debug-transcribed-text"),
+  debugAiContext: document.getElementById("debug-ai-context"),
+  debugAiReply: document.getElementById("debug-ai-reply"),
 };
 
 const STORAGE_KEYS = {
@@ -52,14 +56,23 @@ const AI_BACKEND_URL = "https://tomi-tutor.onrender.com";
 
 const NO_HEBREW_VOICE_WARNING = "בַּמַּכְשִׁיר הַזֶּה לֹא נִמְצָא קוֹל עִבְרִי.";
 const NO_MALE_HEBREW_VOICE_WARNING = "במכשיר הזה לא נמצא קול עברי גברי. אפשר להחליף קול בהגדרות המכשיר.";
-const NEXT_EXERCISE_LINE = "כָּל הַכָּבוֹד טוֹמִי, סִיַּמְתָּ אֶת הַתַּרְגִּיל.";
+const NEXT_EXERCISE_LINE = "כֹּל הַכָּבוֹד טוֹמִי, סִיַּמְתָּ אֶת הַתַּרְגִּיל.";
 const ALMOST_DONE_LINE = "כִּמְעַט סִיַּמְנוּ. נִשְׁאַרוּ עוֹד כַּמָּה כַּרְטִיסִים.";
-const CORRECT_LINE = "כָּל הַכָּבוֹד!";
+const CORRECT_LINE = "כֹּל הַכָּבוֹד!";
 const WRONG_LINE = "לֹא נָכוֹן, נְנַסֶּה שׁוּב.";
-const SPEECH_FALLBACK_LINE = "לֹא שָׁמַעְתִּי. נַנְסֶּה שׁוּב?";
+const SPEECH_FALLBACK_LINE = "לֹא שָׁמַעְתִּי בְּבֵרוּר. רוֹצֶה לְנַסּוֹת שׁוּב?";
 const LISTENING_LINE = "לִיאוֹ מַקְשִׁיב...";
+const HARD_HELP_LINE = "אֲנִי מֵבִין. נַעֲשֶׂה אֶת זֶה לְאַט. רוֹצֶה רֶמֶז קָטָן?";
 const RESISTANT_SOFT_CHOICE =
   "אֲנִי מֵבִין. לֹא חַיָּבִים הַרְבֵּה. נַעֲשֶׂה רַק כַּרְטִיס אֶחָד אוֹ שֶׁתִּבְחַר מִשְׂחָק קָטָן?";
+const MIN_RECORDING_MS = 1000;
+const APP_MODES = {
+  ENTRY: "entry",
+  PRE_LESSON_TALK: "pre_lesson_talk",
+  LESSON_MENU: "lesson_menu",
+  EXERCISE: "exercise",
+  PARENT_PANEL: "parent_panel",
+};
 
 let lessonData = { title: "", exercises: [] };
 let currentExerciseIndex = 0;
@@ -73,11 +86,29 @@ let hasMaleHebrewVoice = true;
 let recognitionInProgress = false;
 let activeMediaRecorder = null;
 let activeRecorderChunks = [];
+let recordingStartAt = 0;
 let silenceTimeoutId = null;
 let activeAudioContext = null;
 let activeAnalyser = null;
 let activeMediaStream = null;
 let offlineAudioMode = false;
+let selectedVoice = null;
+let appMode = APP_MODES.ENTRY;
+let latestTranscribedText = "";
+let latestAiContext = "";
+let latestAiReply = "";
+
+function setMode(mode) {
+  appMode = mode;
+  renderDebugPanel();
+}
+
+function renderDebugPanel() {
+  if (elements.debugAppMode) elements.debugAppMode.textContent = appMode || "—";
+  if (elements.debugTranscribedText) elements.debugTranscribedText.textContent = latestTranscribedText || "—";
+  if (elements.debugAiContext) elements.debugAiContext.textContent = latestAiContext || "—";
+  if (elements.debugAiReply) elements.debugAiReply.textContent = latestAiReply || "—";
+}
 
 function getAiConversationHelper() {
   if (window.AIConversation && typeof window.AIConversation.createLeoReply === "function") {
@@ -107,12 +138,20 @@ function buildLeoPrompt(mode, recognizedText, exercise, learnerProgress) {
     "אם הילד אומר 'קשה' פשט את המשימה בצעד קטן. " +
     "אם הילד אומר 'לא רוצה' תעודד בעדינות וללא לחץ.";
 
+  const contextRules =
+    mode === "pre_lesson_talk"
+      ? "אם ההקשר הוא pre_lesson_talk: שיחה בלבד, תשובה קצרה, שאלת המשך אחת לכל היותר, בלי לענות תשובות תרגיל."
+      : mode === "exercise_help"
+        ? "אם ההקשר הוא exercise_help: עזרה רק בתרגיל הנוכחי."
+        : "";
+
   return [
     "אַתָּה לֵיאוֹ, מוֹרֶה עִבְרִית חַם לְיַלְדֵי כִּתָּה א׳.",
     "תַּעֲנֶה רַק בְּעִבְרִית עִם נִקּוּד מָלֵא.",
     "מִשְׁפָּטִים קְצָרִים. טוֹן רָגוּעַ וְיְלָדוּתִי.",
     "אַל תִּשְׁתַּמֵּשׁ בְּתַבְנִית קְבוּעָה. תְּגוּבָה חַיֶּבֶת לְהִתְבַּסֵּס עַל מִלּוֹת הַיֶּלֶד.",
     emotionalHints,
+    contextRules,
     `הֶקְשֵׁר: ${mode}.`,
     `תַּרְגִּיל נוֹכְחִי: ${exerciseTitle}.`,
     `הִתְקַדְּמוּת: הֻשְׁלְמוּ ${completedCount}, מְאַתְגְּרִים ${difficultCount}.`,
@@ -130,11 +169,15 @@ async function askLeoAI(contextOrMode, recognizedText, exercise, learnerProgress
           recognizedText,
           message: buildLeoPrompt(contextOrMode, recognizedText, exercise, learnerProgress),
         };
+  latestAiContext = context?.context || context?.type || "unknown";
+  renderDebugPanel();
   try {
     const response = await fetch(`${AI_BACKEND_URL}/api/leo-chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        context: context?.context || context?.type || null,
+        currentExercise: context?.currentExercise ?? exercise ?? null,
         transcribedText: context?.recognizedText,
         message:
           context?.message ||
@@ -147,6 +190,8 @@ async function askLeoAI(contextOrMode, recognizedText, exercise, learnerProgress
 
     const data = await response.json();
     if (typeof data?.reply === "string" && data.reply.trim().length > 0) {
+      latestAiReply = data.reply;
+      renderDebugPanel();
       return {
         reply: data.reply,
         emotion: data.emotion || "unknown",
@@ -156,8 +201,10 @@ async function askLeoAI(contextOrMode, recognizedText, exercise, learnerProgress
   } catch (error) {
     console.warn("askLeoAI falling back to local AIConversation:", error);
   }
-
-  return fallbackLeoReply(context);
+  const fallback = fallbackLeoReply(context);
+  latestAiReply = fallback?.reply || "";
+  renderDebugPanel();
+  return fallback;
 }
 
 async function setTalkStatusFromAi(context) {
@@ -262,18 +309,15 @@ async function getVoices() {
   });
 }
 
-async function speak(text) {
-  if (!text) return;
-  lastSpokenText = text;
-  speechSynthesis.cancel();
+async function initVoiceSelection() {
   const voices = await getVoices();
   const hebrewVoices = voices.filter((voice) => voice.lang?.toLowerCase().startsWith("he"));
   const maleHebrewVoices = hebrewVoices.filter((voice) => isMaleVoice(voice));
   const preferredVoicePool = maleHebrewVoices.length > 0 ? maleHebrewVoices : hebrewVoices;
-  const hebrewVoice = preferredVoicePool
+  selectedVoice = preferredVoicePool
     .slice()
-    .sort((a, b) => scoreVoice(b) - scoreVoice(a))[0];
-  hasHebrewVoice = Boolean(hebrewVoice);
+    .sort((a, b) => scoreVoice(b) - scoreVoice(a))[0] || null;
+  hasHebrewVoice = Boolean(selectedVoice);
   hasMaleHebrewVoice = maleHebrewVoices.length > 0;
 
   if (!hasHebrewVoice) {
@@ -286,12 +330,21 @@ async function speak(text) {
     elements.voiceWarning.hidden = true;
     elements.voiceWarning.textContent = "";
   }
+}
+
+async function speak(text) {
+  if (!text) return;
+  lastSpokenText = text;
+  speechSynthesis.cancel();
+  if (selectedVoice === null && hasHebrewVoice) {
+    await initVoiceSelection();
+  }
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "he-IL";
   utterance.rate = 0.85;
   utterance.pitch = 0.92;
-  if (hebrewVoice) utterance.voice = hebrewVoice;
+  if (selectedVoice) utterance.voice = selectedVoice;
   speechSynthesis.speak(utterance);
 }
 
@@ -469,6 +522,7 @@ function renderChoiceItem(exercise) {
     optionBtn.className = "choice-card";
     optionBtn.textContent = option;
     optionBtn.addEventListener("click", () => {
+      if (appMode !== APP_MODES.EXERCISE) return;
       const isCorrect = option === correctAnswer;
       elements.statusMessage.textContent = getFeedbackByExerciseType(exercise.type, isCorrect);
       leoReaction(isCorrect ? "correct" : "wrong");
@@ -498,6 +552,7 @@ function renderMatchExercise(exercise) {
     soundButton.textContent = pair.sound;
     soundButton.dataset.sound = pair.sound;
     soundButton.addEventListener("click", () => {
+      if (appMode !== APP_MODES.EXERCISE) return;
       selectedSound = pair.sound;
       elements.soundGrid.querySelectorAll(".sound-card").forEach((card) => {
         card.classList.toggle("selected", card.dataset.sound === selectedSound);
@@ -514,6 +569,7 @@ function renderMatchExercise(exercise) {
     pictureButton.innerHTML = `<span>${pair.emoji}</span>`;
     pictureButton.setAttribute("aria-label", pair.displayWordWithNikud || pair.word || "");
     pictureButton.addEventListener("click", () => {
+      if (appMode !== APP_MODES.EXERCISE) return;
       if (!selectedSound) {
         elements.statusMessage.textContent = "בְּחַר צְלִיל וְאָז תְּמוּנָה.";
         leoReaction("interaction");
@@ -567,6 +623,7 @@ function renderWritingExercise(exercise) {
 }
 
 function openExercise() {
+  setMode(APP_MODES.EXERCISE);
   resetExerciseState();
   const exercise = currentExercise();
   elements.exercisePanel.hidden = false;
@@ -781,9 +838,10 @@ async function startConversationRecording() {
     };
     activeMediaRecorder.onstop = async () => {
       const audioBlob = new Blob(activeRecorderChunks, { type: mimeType || "audio/webm" });
+      const recordingDuration = Date.now() - recordingStartAt;
       activeMediaRecorder = null;
       setTalkRecordButton(false);
-      await processRecordedAudio(audioBlob);
+      await processRecordedAudio(audioBlob, recordingDuration);
     };
 
     activeAudioContext = new window.AudioContext();
@@ -794,6 +852,7 @@ async function startConversationRecording() {
 
     elements.talkStatus.textContent = LISTENING_LINE;
     setTalkRecordButton(true);
+    recordingStartAt = Date.now();
     activeMediaRecorder.start();
     monitorSilence();
   } catch (error) {
@@ -805,7 +864,12 @@ async function startConversationRecording() {
   }
 }
 
-async function processRecordedAudio(audioBlob) {
+async function processRecordedAudio(audioBlob, durationMs = 0) {
+  if (durationMs > 0 && durationMs < MIN_RECORDING_MS) {
+    elements.talkStatus.textContent = SPEECH_FALLBACK_LINE;
+    await speak(SPEECH_FALLBACK_LINE);
+    return;
+  }
   try {
     const recognizedText = await transcribeAudioBlob(audioBlob);
     await processRecognizedSpeech(recognizedText);
@@ -817,16 +881,20 @@ async function processRecordedAudio(audioBlob) {
 }
 
 async function processRecognizedSpeech(recognizedText) {
-  if (!recognizedText) {
+  latestTranscribedText = String(recognizedText || "").trim();
+  renderDebugPanel();
+  if (!latestTranscribedText) {
     elements.talkStatus.textContent = SPEECH_FALLBACK_LINE;
     await speak(SPEECH_FALLBACK_LINE);
     return;
   }
 
   const aiResult = await askLeoAI({
-    type: "pre_lesson",
-    recognizedText,
-    message: buildLeoPrompt("pre_lesson", recognizedText, currentExercise(), progress),
+    context: "pre_lesson_talk",
+    type: "pre_lesson_talk",
+    currentExercise: null,
+    recognizedText: latestTranscribedText,
+    message: buildLeoPrompt("pre_lesson_talk", latestTranscribedText, null, progress),
   });
   const replyText = aiResult?.nextAction === "offer_choice" && aiResult?.emotion === "resistant"
     ? RESISTANT_SOFT_CHOICE
@@ -834,7 +902,7 @@ async function processRecognizedSpeech(recognizedText) {
 
   progress.voiceReflections.push({
     at: new Date().toISOString(),
-    transcribedText: recognizedText,
+    transcribedText: latestTranscribedText,
     aiReply: replyText,
     nextAction: aiResult?.nextAction || "encourage",
     offline: offlineAudioMode,
@@ -893,6 +961,7 @@ async function loadLesson() {
 }
 
 function showLessonFlow() {
+  setMode(APP_MODES.LESSON_MENU);
   elements.lessonMenu.hidden = false;
   elements.exercisePanel.hidden = false;
   renderLessonMenu();
@@ -900,110 +969,163 @@ function showLessonFlow() {
   renderParentPanel();
 }
 
+function handleExerciseAnswerClick(type) {
+  if (appMode !== APP_MODES.EXERCISE) return;
+  if (type === "success") {
+    const exercise = currentExercise();
+    if (!canCompleteCurrentExercise()) {
+      elements.statusMessage.textContent = ALMOST_DONE_LINE;
+      speak(ALMOST_DONE_LINE);
+      return;
+    }
+    markCompleted(exercise.id);
+    renderLessonMenu();
+    renderParentPanel();
+    speak(NEXT_EXERCISE_LINE);
+    elements.statusMessage.textContent = NEXT_EXERCISE_LINE;
+    moveToNextExercise();
+  }
+}
+
+function handleMoodClick(moodType) {
+  if (moodType === "hard") {
+    if (appMode === APP_MODES.EXERCISE) {
+      markDifficult(currentExercise().id);
+      renderParentPanel();
+    }
+    elements.statusMessage.textContent = HARD_HELP_LINE;
+    elements.choiceArea.hidden = false;
+    elements.choiceArea.innerHTML = "";
+    ["רֶמֶז", "נְנַסֶּה שׁוּב", "הַפְסָקָה קְצָרָה"].forEach((label) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "choice-card";
+      button.textContent = label;
+      elements.choiceArea.appendChild(button);
+    });
+    speak(HARD_HELP_LINE);
+    return;
+  }
+
+  if (moodType === "ending") {
+    return (buttonMood) => {
+      progress.lastMood = buttonMood;
+      progress.moodAnswers.push({ mood: buttonMood, at: new Date().toISOString() });
+      saveProgress();
+      renderParentPanel();
+      speak("תּוֹדָה שֶׁשִּׁתַּפְתָּ אוֹתִי.");
+    };
+  }
+}
+
+function handleTalkClick(action) {
+  if (action === "yes") {
+    setMode(APP_MODES.PRE_LESSON_TALK);
+    elements.preLesson.hidden = true;
+    elements.talkPanel.hidden = false;
+    elements.talkStatus.textContent = LISTENING_LINE;
+    speak("מְעוּלֶּה, אֲנִי מַקְשִׁיב.");
+    startConversationRecording();
+    return;
+  }
+
+  if (action === "no") {
+    stopConversationRecording();
+    elements.preLesson.hidden = true;
+    showLessonFlow();
+    return;
+  }
+
+  if (action === "to_lesson") {
+    stopConversationRecording();
+    elements.talkPanel.hidden = true;
+    showLessonFlow();
+  }
+}
+
+function handleParentPanelClick(action) {
+  setMode(APP_MODES.PARENT_PANEL);
+  if (action === "toggle") {
+    const isExpanded = elements.parentToggleBtn.getAttribute("aria-expanded") === "true";
+    elements.parentToggleBtn.setAttribute("aria-expanded", String(!isExpanded));
+    elements.parentContent.hidden = isExpanded;
+    return;
+  }
+
+  if (action === "reset") {
+    const shouldClear = window.confirm("לְאַשֵּׁר נִקּוּי נְתוּנֵי בְּדִיקָה?");
+    if (!shouldClear) {
+      elements.parentFeedback.textContent = "הַנִּקּוּי בֻּטַּל.";
+      return;
+    }
+    clearTestingData();
+    elements.parentFeedback.textContent = "נְתוּנֵי הַבְּדִיקָה נוּקּוּ.";
+  }
+}
+
 elements.enterBtn.addEventListener("click", async () => {
+  setMode(APP_MODES.PRE_LESSON_TALK);
   elements.entryScreen.hidden = true;
   elements.preLesson.hidden = false;
+  elements.preLesson.animate(
+    [{ opacity: 0, transform: "translateY(8px)" }, { opacity: 1, transform: "translateY(0)" }],
+    { duration: 350, easing: "ease-out", fill: "both" }
+  );
+  await new Promise((resolve) => setTimeout(resolve, 260));
   await speak("שָׁלוֹם טוֹמִי, אֲנִי לִיאוֹ, הַמּוֹרֶה הַפְּרָטִי שֶׁלְּךָ.");
 });
 
-elements.talkYesBtn.addEventListener("click", async () => {
-  elements.preLesson.hidden = true;
-  elements.talkPanel.hidden = false;
-  elements.talkStatus.textContent = LISTENING_LINE;
-  await speak("מְעוּלֶּה, אֲנִי מַקְשִׁיב.");
-  await startConversationRecording();
-});
-
-elements.talkNoBtn.addEventListener("click", () => {
-  stopConversationRecording();
-  elements.preLesson.hidden = true;
-  leoReaction("interaction");
-  showLessonFlow();
-});
-
-elements.toLessonBtn.addEventListener("click", () => {
-  stopConversationRecording();
-  elements.talkPanel.hidden = true;
-  leoReaction("interaction");
-  showLessonFlow();
-});
+elements.talkYesBtn.addEventListener("click", () => handleTalkClick("yes"));
+elements.talkNoBtn.addEventListener("click", () => handleTalkClick("no"));
+elements.toLessonBtn.addEventListener("click", () => handleTalkClick("to_lesson"));
 
 elements.talkRecordBtn.addEventListener("click", handleSpeechInput);
 
 elements.speakAgainBtn.addEventListener("click", () => speak(lastSpokenText));
 
-elements.hardBtn.addEventListener("click", () => {
-  markDifficult(currentExercise().id);
-  elements.statusMessage.textContent = WRONG_LINE;
-  leoReaction("wrong");
-  renderParentPanel();
-});
-
-elements.successBtn.addEventListener("click", () => {
-  const exercise = currentExercise();
-  if (!canCompleteCurrentExercise()) {
-    elements.statusMessage.textContent = ALMOST_DONE_LINE;
-    speak(ALMOST_DONE_LINE);
-    return;
-  }
-
-  markCompleted(exercise.id);
-  renderLessonMenu();
-  renderParentPanel();
-  speak(NEXT_EXERCISE_LINE);
-  elements.statusMessage.textContent = NEXT_EXERCISE_LINE;
-  moveToNextExercise();
-});
+elements.hardBtn.addEventListener("click", () => handleMoodClick("hard"));
+elements.successBtn.addEventListener("click", () => handleExerciseAnswerClick("success"));
 
 elements.endingBtns.forEach((button) => {
   button.addEventListener("click", () => {
-    const mood = button.dataset.mood;
-    progress.lastMood = mood;
-    progress.moodAnswers.push({ mood, at: new Date().toISOString() });
-    saveProgress();
-    renderParentPanel();
-    speak("תּוֹדָה שֶׁשִּׁתַּפְתָּ אוֹתִי.");
+    const handler = handleMoodClick("ending");
+    handler(button.dataset.mood);
   });
 });
 
-elements.parentToggleBtn.addEventListener("click", () => {
-  const isExpanded = elements.parentToggleBtn.getAttribute("aria-expanded") === "true";
-  elements.parentToggleBtn.setAttribute("aria-expanded", String(!isExpanded));
-  elements.parentContent.hidden = isExpanded;
-});
-
-elements.parentResetBtn?.addEventListener("click", () => {
-  const shouldClear = window.confirm("לְאַשֵּׁר נִקּוּי נְתוּנֵי בְּדִיקָה?");
-  if (!shouldClear) {
-    elements.parentFeedback.textContent = "הַנִּקּוּי בֻּטַּל.";
-    return;
-  }
-  clearTestingData();
-  elements.parentFeedback.textContent = "נְתוּנֵי הַבְּדִיקָה נוּקּוּ.";
-});
+elements.parentToggleBtn.addEventListener("click", () => handleParentPanelClick("toggle"));
+elements.parentResetBtn?.addEventListener("click", () => handleParentPanelClick("reset"));
 
 document.addEventListener("click", (event) => addClickFeedback(event.target), true);
 
 async function setAvatar() {
   const imageUrl = "assets/leo/leo-avatar.png";
-  try {
-    const response = await fetch(imageUrl, { method: "HEAD" });
-    if (response.ok) {
-      elements.leoAvatar.style.backgroundImage = `url('${imageUrl}')`;
-      elements.leoAvatar.classList.add("avatar-image");
-      return;
-    }
-  } catch {
-    // Keep fallback avatar
+  elements.leoAvatar.classList.add("avatar-loading");
+  elements.leoAvatar.textContent = "…";
+  const image = new Image();
+  await new Promise((resolve) => {
+    image.onload = resolve;
+    image.onerror = resolve;
+    image.src = imageUrl;
+  });
+  if (image.complete && image.naturalWidth > 0) {
+    elements.leoAvatar.style.backgroundImage = `url('${imageUrl}')`;
+    elements.leoAvatar.classList.add("avatar-image", "avatar-ready");
+    elements.leoAvatar.textContent = "";
+  } else {
+    elements.leoAvatar.textContent = "לֵיאוֹ";
   }
-  elements.leoAvatar.textContent = "לֵיאוֹ";
+  elements.leoAvatar.classList.remove("avatar-loading");
 }
 
 async function init() {
+  setMode(APP_MODES.ENTRY);
   progress = loadProgress();
   lessonData = await loadLesson();
   await setAvatar();
+  await initVoiceSelection();
   setTalkRecordButton(false);
+  renderDebugPanel();
 }
 
 init();
