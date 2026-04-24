@@ -1,7 +1,7 @@
 (function attachAiConversation(globalScope) {
   function createLeoReply(context) {
     const childText = String(context?.recognizedText || "").trim();
-    if (context?.type === "pre_lesson" && childText) {
+    if (context?.type === "pre_lesson_talk" && childText) {
       if (childText.includes("לא רוצה") || childText.includes("עזוב") || childText.includes("די")) {
         return {
           reply: "אֲנִי מֵבִין. לֹא חַיָּבִים הַרְבֵּה. נַעֲשֶׂה רַק כַּרְטִיס אֶחָד אוֹ מִשְׂחָק קָטָן?",
