@@ -73,12 +73,30 @@ body {
 }
 
 .big-btn {
+  position: relative;
+  overflow: hidden;
   border: none;
   border-radius: 16px;
   padding: 0.9rem;
   font-size: 1.2rem;
   font-weight: 700;
   background: #f0ece7;
+  cursor: pointer;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+}
+
+.big-btn:hover,
+.sound-card:hover,
+.picture-card:hover,
+.choice-card:hover,
+.exercise-card:hover,
+.parent-toggle:hover {
+  box-shadow: 0 6px 16px rgba(54, 34, 20, 0.14);
+}
+
+.button-clicked {
+  transform: scale(0.97);
+  filter: brightness(1.06);
 }
 
 .primary {
@@ -164,6 +182,8 @@ body {
 .sound-card,
 .picture-card,
 .choice-card {
+  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+  cursor: pointer;
   border: 2px solid #e4cbb0;
   border-radius: 14px;
   padding: 0.7rem;
@@ -190,6 +210,27 @@ body {
   background: #f4fbf7;
 }
 
+.writing-example {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0.5rem 0;
+}
+
+.writing-inputs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(70px, 1fr));
+  gap: 0.6rem;
+}
+
+.writing-input {
+  min-height: 54px;
+  border-radius: 12px;
+  border: 2px solid #d8c1aa;
+  font-size: 1.3rem;
+  padding: 0.4rem 0.5rem;
+  text-align: center;
+}
+
 .controls-row {
   margin-top: 0.8rem;
   grid-template-columns: repeat(3, minmax(100px, 1fr));
@@ -199,4 +240,40 @@ body {
   margin: 0;
   padding-right: 1.2rem;
   line-height: 1.7;
+}
+
+.parent-toggle {
+  width: 100%;
+  border: 2px solid #d8c1aa;
+  border-radius: 14px;
+  background: #fff;
+  font-size: 1.1rem;
+  font-weight: 800;
+  padding: 0.8rem;
+  text-align: right;
+}
+
+.parent-progress-wrap {
+  margin: 0.8rem 0;
+}
+
+.parent-progress-wrap p {
+  margin: 0 0 0.4rem;
+  font-weight: 700;
+}
+
+.parent-progress-bar {
+  width: 100%;
+  height: 14px;
+  border-radius: 999px;
+  background: #efe1d4;
+  overflow: hidden;
+}
+
+#parent-progress-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #f3a86f, #8ed4a7);
+  transition: width 0.2s ease;
 }

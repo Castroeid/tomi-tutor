@@ -1,14 +1,14 @@
 (function attachAiConversation(globalScope) {
   const OPENING_LINES = [
-    "איזה כיף לדבר איתך. אני מקשיב.",
-    "אני כאן איתך, אפשר לספר לי לאט.",
-    "מעולה שבחרת לדבר איתי לפני השיעור."
+    "אֵיזֶה כֵּיף לְדַבֵּר אִתְּךָ. אֲנִי מַקְשִׁיב.",
+    "אֲנִי כָּאן אִתְּךָ, אֶפְשָׁר לְסַפֵּר לִי לְאַט.",
+    "מְעוּלֶּה שֶׁבָּחַרְתָּ לְדַבֵּר אִתִּי לִפְנֵי הַשִּׁעוּר."
   ];
 
   const AFTER_RECORDING_LINES = [
-    "תודה ששיתפת אותי. עכשיו נמשיך לשיעור.",
-    "שמתי לב למאמץ שלך. בוא נמשיך יחד.",
-    "יופי של שיתוף. ממשיכים לתרגיל הבא?"
+    "תּוֹדָה שֶׁשִּׁתַּפְתָּ אוֹתִי. עַכְשָׁיו נַמְשִׁיךְ לַשִּׁעוּר.",
+    "שַׂמְתִּי לֵב לַמַּאֲמָץ שֶׁלְּךָ. בּוֹא נַמְשִׁיךְ יַחַד.",
+    "יוֹפִי שֶׁל שִׁתּוּף. נַעֲבוֹר לַתַּרְגִּיל הַבָּא?"
   ];
 
   function pickByNumber(list, value) {
@@ -21,14 +21,14 @@
     if (context?.type === "recording-saved") {
       const sizeHint = context.recordingSize || 0;
       const line = pickByNumber(AFTER_RECORDING_LINES, sizeHint);
-      return `${line} שמרתי את ההקלטה ללוח ההורים.`;
+      return `${line} שָׁמַרְתִּי אֶת הַהַקְלָטָה לְלוּחַ הַהוֹרִים.`;
     }
 
     if (context?.type === "conversation-start") {
       return pickByNumber(OPENING_LINES, Date.now());
     }
 
-    return "אני כאן בשבילך. נמשיך צעד צעד.";
+    return "אֲנִי כָּאן בִּשְׁבִילְךָ. נַמְשִׁיךְ צַעַד־צַעַד.";
   }
 
   globalScope.AIConversation = {

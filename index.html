@@ -35,7 +35,7 @@
           <button id="talk-record-btn" class="big-btn">הַקְלֵט</button>
         </div>
         <div class="button-row single">
-          <button id="to-lesson-btn" class="big-btn success">מַשְׁמִיכִים לַשִּׁעוּר</button>
+          <button id="to-lesson-btn" class="big-btn success">מַמְשִׁיכִים לַשִּׁעוּר</button>
         </div>
       </section>
 
@@ -65,7 +65,9 @@
         </section>
 
         <section id="writing-area" class="writing-area" hidden>
-          <p>✍️ כְּתוֹב אֶת הַהֲבָרָה בַּמַּחְבֶּרֶת, וּכְשֶׁסִּיַּמְתָּ לַחַץ "הִצְלַחְתִּי".</p>
+          <p id="writing-instruction"></p>
+          <p id="writing-example" class="writing-example"></p>
+          <div id="writing-inputs" class="writing-inputs"></div>
         </section>
 
         <div class="button-row controls-row">
@@ -86,8 +88,16 @@
       </section>
 
       <section id="parent-panel" class="card" hidden>
-        <h3>לוּחַ הוֹרִים</h3>
-        <ul id="parent-stats"></ul>
+        <button id="parent-toggle-btn" class="parent-toggle" type="button" aria-expanded="false">לְהוֹרִים</button>
+        <div id="parent-content" hidden>
+          <div class="parent-progress-wrap">
+            <p id="parent-progress-label"></p>
+            <div class="parent-progress-bar" aria-hidden="true">
+              <span id="parent-progress-fill"></span>
+            </div>
+          </div>
+          <ul id="parent-stats"></ul>
+        </div>
       </section>
     </main>
 
