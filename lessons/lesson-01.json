@@ -1,6 +1,11 @@
 {
   "id": "lesson-01",
   "title": "שִׁעוּר קָטָן בְּעִבְרִית",
+  "pedagogyComments": [
+    "הַתְאָמָה בְּעִבְרִית חַיֶּבֶת לְהִתְבַּסֵּס עַל הֲבָרָה/צְלִיל פּוֹתֵחַ מָלֵא, וְלֹא רַק עַל אוֹת בּוֹדֶדֶת.",
+    "נִקּוּד מְשַׁנֶּה אֶת הַצְּלִיל, לָכֵן מִלִּים עִם אוֹת זֵהָה אֲבָל נִקּוּד שׁוֹנֶה אֵינָן הֶתְאָמָה קוֹלִית.",
+    "לִפְנֵי הוֹסָפַת תַּרְגִּיל חָדָשׁ יֵשׁ לִבְדֹּק תְּאִימוּת מְלֵאָה בֵּין מִלָּה, תְּמוּנָה/אֵימוֹג'ִי, רֶמֶז וּתְשׁוּבָה."
+  ],
   "exercises": [
     {
       "id": "match-opening-1",
@@ -11,19 +16,40 @@
       "instruction": "בְּחַר צְלִיל, וְאַחַר כָּךְ תְּמוּנָה.",
       "pairs": [
         {
+          "word": "מַתָּנָה",
+          "displayWordWithNikud": "מַתָּנָה",
+          "openingSound": "מַ",
           "sound": "מַ",
-          "emoji": "🎁",
-          "label": "מַתָּנָה"
+          "expectedAnswer": "מַ",
+          "distractors": [
+            "מֶ",
+            "מִ"
+          ],
+          "emoji": "🎁"
         },
         {
+          "word": "סַל",
+          "displayWordWithNikud": "סַל",
+          "openingSound": "סַ",
           "sound": "סַ",
-          "emoji": "🧺",
-          "label": "סַל"
+          "expectedAnswer": "סַ",
+          "distractors": [
+            "סֶ",
+            "סִ"
+          ],
+          "emoji": "🧺"
         },
         {
-          "sound": "כַּ",
-          "emoji": "🧢",
-          "label": "כּוֹבַע"
+          "word": "כּוֹבַע",
+          "displayWordWithNikud": "כּוֹבַע",
+          "openingSound": "כּוֹ",
+          "sound": "כּוֹ",
+          "expectedAnswer": "כּוֹ",
+          "distractors": [
+            "כַּ",
+            "כִּ"
+          ],
+          "emoji": "🧢"
         }
       ]
     },
@@ -31,27 +57,79 @@
       "id": "missing-syllable-1",
       "type": "missing-syllable",
       "title": "הֲבָרָה חֲסֵרָה",
-      "text": "הַשְׁלֵם: תַּ__חַת. מָה מַתְאִים?",
-      "voiceText": "הַשְׁלֵם: תַּפּוּחַ.",
-      "options": [
-        "פּוּ",
-        "כּוּ",
-        "לוּ"
-      ],
-      "answer": "פּוּ"
+      "text": "הַשְׁלֵם אֶת הַחֵלֶק הַחָסֵר.",
+      "voiceText": "הַשְׁלֵם אֶת הַחֵלֶק הַחָסֵר.",
+      "items": [
+        {
+          "word": "תַּפּוּחַ",
+          "displayWordWithNikud": "תַּפּוּחַ",
+          "openingSound": "תַּ",
+          "prompt": "הַשְׁלֵם: תַּ__וּחַ",
+          "expectedAnswer": "פּ",
+          "distractors": [
+            "בּ",
+            "מ"
+          ],
+          "emoji": "🍎"
+        },
+        {
+          "word": "שֶׁמֶשׁ",
+          "displayWordWithNikud": "שֶׁמֶשׁ",
+          "openingSound": "שֶׁ",
+          "prompt": "הַשְׁלֵם: __מֶשׁ",
+          "expectedAnswer": "שֶׁ",
+          "distractors": [
+            "שָׁ",
+            "סֶ"
+          ],
+          "emoji": "☀️"
+        },
+        {
+          "word": "סִירָה",
+          "displayWordWithNikud": "סִירָה",
+          "openingSound": "סִי",
+          "prompt": "הַשְׁלֵם: __רָה",
+          "expectedAnswer": "סִי",
+          "distractors": [
+            "סַ",
+            "צִי"
+          ],
+          "emoji": "⛵"
+        },
+        {
+          "word": "מַתָּנָה",
+          "displayWordWithNikud": "מַתָּנָה",
+          "openingSound": "מַ",
+          "prompt": "הַשְׁלֵם: __תָּנָה",
+          "expectedAnswer": "מַ",
+          "distractors": [
+            "מֶ",
+            "נַ"
+          ],
+          "emoji": "🎁"
+        }
+      ]
     },
     {
       "id": "same-opening-1",
       "type": "same-opening-sound",
       "title": "מָה מַתְחִיל כְּמוֹ",
-      "text": "מָה מַתְחִיל בְּאוֹתוֹ צְלִיל כְּמוֹ שֶׁמֶשׁ?",
-      "voiceText": "מָה מַתְחִיל בְּאוֹתוֹ צְלִיל כְּמוֹ שֶׁמֶשׁ?",
-      "options": [
-        "שַׁבָּת",
-        "דָּג",
-        "חוּט"
-      ],
-      "answer": "שַׁבָּת"
+      "text": "נַחְפֵּשׂ מִלִּים שֶׁמַּתְחִילוֹת בְּאוֹתוֹ צְלִיל מַמָּשׁ — גַּם הָאוֹת וְגַם הַנִּקּוּד.",
+      "voiceText": "נַחְפֵּשׂ מִלִּים שֶׁמַּתְחִילוֹת בְּאוֹתוֹ צְלִיל מַמָּשׁ — גַּם הָאוֹת וְגַם הַנִּקּוּד.",
+      "items": [
+        {
+          "word": "שֶׁמֶשׁ",
+          "displayWordWithNikud": "שֶׁמֶשׁ",
+          "openingSound": "שֶׁ",
+          "prompt": "מָה מַתְחִיל בְּאוֹתוֹ צְלִיל כְּמוֹ שֶׁמֶשׁ?",
+          "expectedAnswer": "שֶׁבֶת",
+          "distractors": [
+            "שָׁלוֹם",
+            "מַתָּנָה"
+          ],
+          "emoji": "☀️"
+        }
+      ]
     },
     {
       "id": "read-syllables-1",
@@ -72,12 +150,15 @@
       "title": "הַשְׁלָמַת אוֹת",
       "text": "הַשְׁלֵם אֶת הַמִּלָּה: __וֹרָה",
       "voiceText": "אֵיזוֹ אוֹת חֲסֵרָה בַּמִּלָּה תּוֹרָה?",
-      "options": [
-        "תּ",
+      "word": "תּוֹרָה",
+      "displayWordWithNikud": "תּוֹרָה",
+      "openingSound": "תּוֹ",
+      "expectedAnswer": "תּ",
+      "distractors": [
         "ק",
         "ר"
       ],
-      "answer": "תּ"
+      "emoji": "📖"
     },
     {
       "id": "writing-copy-1",
