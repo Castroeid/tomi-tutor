@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>tomi-reading-tutor</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="top-card">
+        <h1>המורה של תומי</h1>
+        <p class="subtitle">לומדים לקרוא ולכתוב בצעדים קטנים ונעימים.</p>
+      </header>
+
+      <section class="lesson-progress card" aria-live="polite">
+        <h2 id="lesson-title">טוען שיעור…</h2>
+        <p id="step-counter"></p>
+        <p id="status-message" class="status-message"></p>
+      </section>
+
+      <section class="step-content card" id="step-container" aria-live="polite">
+        <h3 id="step-title"></h3>
+        <p id="step-text"></p>
+
+        <div id="choice-grid" class="choice-grid" hidden></div>
+
+        <div id="writing-prompt" class="writing-prompt" hidden>
+          <p>✍️ כתוב במחברת שלך, וכשתסיים תלחץ "הצלחתי".</p>
+        </div>
+      </section>
+
+      <section class="controls card">
+        <div class="button-row">
+          <button id="speak-again" class="big-btn">שמע שוב</button>
+          <button id="ready-btn" class="big-btn primary">אני מוכן</button>
+        </div>
+        <div class="button-row">
+          <button id="record-btn" class="big-btn">הקלט אותי</button>
+          <button id="play-recording-btn" class="big-btn" disabled>שמע אותי</button>
+        </div>
+        <div class="button-row">
+          <button id="success-btn" class="big-btn success">הצלחתי</button>
+          <button id="hard-btn" class="big-btn warning">היה לי קשה</button>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>

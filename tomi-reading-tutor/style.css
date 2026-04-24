@@ -1,0 +1,155 @@
+:root {
+  --bg: #fff8ef;
+  --card: #fffefb;
+  --primary: #ff9f6b;
+  --primary-dark: #e28049;
+  --accent: #8ec8b7;
+  --text: #2e2a28;
+  --success: #7dcf9a;
+  --warning: #ffd47a;
+  --shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Arial", "Heebo", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-shell {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 1rem;
+  display: grid;
+  gap: 1rem;
+}
+
+.card,
+.top-card {
+  background: var(--card);
+  border-radius: 24px;
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.top-card {
+  background: linear-gradient(135deg, #ffe5c8, #fff3e5);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0 0 0.5rem;
+}
+
+h1 {
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+}
+
+.subtitle {
+  font-size: 1.1rem;
+}
+
+#step-title {
+  font-size: clamp(1.5rem, 3.6vw, 2rem);
+  color: #5d3d2d;
+}
+
+#step-text {
+  font-size: 1.2rem;
+  line-height: 1.6;
+}
+
+.status-message {
+  min-height: 1.8rem;
+  font-size: 1rem;
+  color: #5a4f4a;
+}
+
+.choice-grid {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 0.75rem;
+}
+
+.choice-card {
+  border: 2px solid #f5d2b8;
+  border-radius: 18px;
+  padding: 1rem 0.4rem;
+  text-align: center;
+  background: #fff5ec;
+  font-size: 2rem;
+}
+
+.choice-card span {
+  display: block;
+  margin-top: 0.4rem;
+  font-size: 1.1rem;
+}
+
+.writing-prompt {
+  margin-top: 1rem;
+  background: #f0faf6;
+  border-radius: 14px;
+  padding: 0.8rem;
+  font-size: 1.1rem;
+}
+
+.controls {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.button-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 0.6rem;
+}
+
+.big-btn {
+  border: none;
+  border-radius: 18px;
+  padding: 1rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  background: #f2ede9;
+  color: var(--text);
+}
+
+.big-btn:disabled {
+  opacity: 0.5;
+}
+
+.primary {
+  background: var(--primary);
+  color: #fff;
+}
+
+.primary:hover {
+  background: var(--primary-dark);
+}
+
+.success {
+  background: var(--success);
+}
+
+.warning {
+  background: var(--warning);
+}
+
+@media (max-width: 640px) {
+  .button-row {
+    grid-template-columns: 1fr;
+  }
+
+  .big-btn {
+    font-size: 1.35rem;
+  }
+}
