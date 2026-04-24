@@ -118,14 +118,37 @@ async function setTalkStatusFromAi(context) {
 
 async function generateExercisesFromBackend(payload = {}) {
   try {
-    const response = await fetch(`${AI_BACKEND_URL}/api/generate-exercises`, {
+    const response = await fetch(`${AI_BACKEND_URL}/api/leo-chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+      body: JSON.stringify({
+        task: "generate-exercises",
+        payload,
+        message:
+          "Generate a grade-1 Hebrew reading lesson as strict JSON with keys title and exercises. " +
+          "Each exercise must include id and type, with beginner-friendly content.",
+      }),
     });
 
     if (!response.ok) throw new Error(`Generate exercises failed: ${response.status}`);
-    return await response.json();
+    const data = await response.json();
+
+    if (data && typeof data.title === "string" && Array.isArray(data.exercises)) {
+      return data;
+    }
+
+    if (typeof data?.reply === "string") {
+      try {
+        const parsedReply = JSON.parse(data.reply);
+        if (parsedReply && typeof parsedReply.title === "string" && Array.isArray(parsedReply.exercises)) {
+          return parsedReply;
+        }
+      } catch (parseError) {
+        console.warn("generateExercisesFromBackend could not parse leo-chat reply JSON:", parseError);
+      }
+    }
+
+    return null;
   } catch (error) {
     console.warn("generateExercisesFromBackend failed, using offline lesson:", error);
     return null;
