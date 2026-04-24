@@ -10,6 +10,7 @@ const worksheetInstructionEl = document.getElementById("worksheet-instruction");
 const syllableGridEl = document.getElementById("syllable-grid");
 const pictureGridEl = document.getElementById("picture-grid");
 const worksheetProgressEl = document.getElementById("worksheet-progress");
+const lessonEndingEl = document.getElementById("lesson-ending");
 
 const speakAgainBtn = document.getElementById("speak-again");
 const readyBtn = document.getElementById("ready-btn");
@@ -28,75 +29,92 @@ let hasStartedLesson = false;
 let lastSpokenText = "";
 let selectedSyllable = null;
 let matchedItems = new Set();
+let lessonEndingOpen = false;
 
 const STORAGE_KEYS = {
   progress: "tomiTutorProgress",
   recordings: "tomiTutorRecordings",
 };
 
+const TEACHER_LINES = {
+  fallbackGreeting: "שָׁלוֹם טוֹמִי, אֵיזֶה כֵּיף שֶׁבָּאתָ.",
+  clickHelp: "אֲנִי אִתְּךָ. נַעֲשֶׂה אֶת זֶה בְּיַחַד.",
+  clickSuccess: "אֵיזֶה יוֹפִי טוֹמִי, הִצְלַחְתָּ!",
+  clickDifficulty: "זֶה בְּסֵדֶר שֶׁקָּשֶׁה. אֲנַחְנוּ מִתְקַדְּמִים צַעַד צַעַד.",
+  clickCorrect: "נָכוֹן מְאֹד, כָּל הַכָּבוֹד!",
+  clickWrong: "נִסָּיוֹן יָפֶה. בּוֹא נְנַסֶּה שׁוּב לְאַט.",
+  endingPrompt: "אֵיךְ הָיָה לְךָ הַיּוֹם?",
+  endingResponses: {
+    easy: "מְעֻלֶּה, אֲנִי גֵּאָה בְּךָ.",
+    ok: "יָפֶה מְאֹד, עָשִׂיתָ דֶּרֶךְ חֲשׁוּבָה.",
+    hard: "אֲנִי יוֹדַעַת שֶׁהָיָה קָשֶׁה, וַעֲדַיִן נִסִּיתָ. זֶה מְעֻלֶּה.",
+    fun: "אֵיזֶה כֵּיף! נַמְשִׁיךְ גַּם בַּפַּעַם הַבָּאָה.",
+  },
+};
+
 const FALLBACK_LESSON = {
   id: "lesson-01",
-  title: "שיעור 1: צלילים ראשונים והברות",
+  title: "שִׁעוּר 1: צְלִילִים רִאשׁוֹנִים וְהַבָּרוֹת",
   steps: [
     {
       id: "worksheet-opening",
       type: "worksheet",
-      title: "תרגיל פתיחה",
-      text: "במה מתחילה כל מילה? נבחר יחד.",
-      voiceText: "במה מתחילה כל מילה? נבחר יחד.",
-      instruction: "במה מתחילה כל מילה? נבחר יחד.",
+      title: "תַּרְגִּיל פְּתִיחָה",
+      text: "בַּמָּה מַתְחִילָה כָּל מִלָּה? נִבְחַר יַחַד.",
+      voiceText: "בַּמָּה מַתְחִילָה כָּל מִלָּה? נִבְחַר יַחַד.",
+      instruction: "בַּמָּה מַתְחִילָה כָּל מִלָּה? נִבְחַר יַחַד.",
       pairs: [
-        { syllable: "מ", emoji: "🫓", label: "מצה" },
-        { syllable: "סי", emoji: "🚣", label: "סירה" },
-        { syllable: "ני", emoji: "📄", label: "נייר" },
-        { syllable: "ש", emoji: "☀️", label: "שמש" },
-        { syllable: "צ", emoji: "🐢", label: "צב" },
-        { syllable: "א", emoji: "🦁", label: "אריה" },
-        { syllable: "ח", emoji: "🐌", label: "חילזון" },
-        { syllable: "תי", emoji: "👜", label: "תיק" },
-        { syllable: "ו", emoji: "🌹", label: "ורד" }
+        { syllable: "מ", emoji: "🫓", label: "מַצָּה" },
+        { syllable: "סִי", emoji: "🚣", label: "סִירָה" },
+        { syllable: "נִי", emoji: "📄", label: "נְיָר" },
+        { syllable: "שׁ", emoji: "☀️", label: "שֶׁמֶשׁ" },
+        { syllable: "צ", emoji: "🐢", label: "צָב" },
+        { syllable: "א", emoji: "🦁", label: "אַרְיֵה" },
+        { syllable: "ח", emoji: "🐌", label: "חִלָּזוֹן" },
+        { syllable: "תִּי", emoji: "👜", label: "תִּיק" },
+        { syllable: "ו", emoji: "🌹", label: "וֶרֶד" },
       ],
-      encouragement: "יופי! מצאת הרבה צלילים פותחים."
+      encouragement: "יוֹפִי! מָצָאתָ הַרְבֵּה צְלִילִים פּוֹתְחִים.",
     },
     {
       id: "missing-letter",
       type: "choices",
-      title: "אות חסרה",
-      text: "השלם את האות החסרה: _ימון. איזו אות מתאימה?",
-      voiceText: "השלם את האות החסרה: לימון.",
+      title: "אוֹת חֲסֵרָה",
+      text: "הַשְׁלֵם אֶת הָאוֹת הַחֲסֵרָה: _ימוֹן. אֵיזוֹ אוֹת מַתְאִימָה?",
+      voiceText: "הַשְׁלֵם אֶת הָאוֹת הַחֲסֵרָה: לִימוֹן.",
       choices: [
         { emoji: "🍋", label: "ל" },
         { emoji: "🍋", label: "ש" },
         { emoji: "🍋", label: "צ" },
-        { emoji: "🍋", label: "א" }
+        { emoji: "🍋", label: "א" },
       ],
-      encouragement: "אלוף! מצאת את האות הנכונה."
+      encouragement: "אַלּוּף! מָצָאתָ אֶת הָאוֹת הַנְּכוֹנָה.",
     },
     {
       id: "read-aloud",
       type: "read",
-      title: "קריאה בקול",
-      text: "קרא בקול: מָה שָׁם? נִיָה שָׂמָה תִיק.",
-      voiceText: "עכשיו נקרא בקול יחד: מה שם? ניה שמה תיק.",
-      encouragement: "יופי של קריאה!"
+      title: "קְרִיאָה בְּקוֹל",
+      text: "קְרָא בְּקוֹל: מָה שָׁם? נִיָּה שָׂמָה תִּיק.",
+      voiceText: "עַכְשָׁיו נִקְרָא בְּקוֹל יַחַד: מָה שָׁם? נִיָּה שָׂמָה תִּיק.",
+      encouragement: "יוֹפִי שֶׁל קְרִיאָה!",
     },
     {
       id: "recording",
       type: "recording",
-      title: "הקלט אותי",
-      text: "לחץ על 'הקלט אותי', קרא את הצלילים: מ, ש, צ, א, ח, ו. ואז עצור.",
-      voiceText: "לחץ על הקלט אותי, קרא את הצלילים מ, ש, צ, א, ח, ו, ואז עצור.",
-      encouragement: "תודה שהקלטת! אפשר לשמוע אותך שוב."
+      title: "הַקְלָטָה",
+      text: "לְחַץ עַל 'הַקְלֵט אוֹתִי', קְרָא אֶת הַצְּלִילִים: מ, שׁ, צ, א, ח, ו. וְאָז עֲצוֹר.",
+      voiceText: "לְחַץ עַל הַקְלֵט אוֹתִי, קְרָא אֶת הַצְּלִילִים מ, שׁ, צ, א, ח, ו, וְאָז עֲצוֹר.",
+      encouragement: "תּוֹדָה שֶׁהִקְלַטְתָּ! אֶפְשָׁר לִשְׁמֹעַ אוֹתְךָ שׁוּב.",
     },
     {
       id: "writing",
       type: "writing",
-      title: "כתיבה במחברת",
-      text: "כתוב במחברת שלוש שורות קצרות: מ, ני, תי, ואז מילה אחת שמתחילה ב-ש.",
-      voiceText: "עכשיו כתיבה במחברת: מ, ני, תי, ואז מילה שמתחילה בש.",
-      encouragement: "הכתיבה שלך חשובה ויפה ✍️"
-    }
-  ]
+      title: "כְּתִיבָה בַּמַּחְבֶּרֶת",
+      text: "כְּתוֹב בַּמַּחְבֶּרֶת שָׁלוֹשׁ שׁוּרוֹת קְצָרוֹת: מ, נִי, תִּי, וְאָז מִלָּה אַחַת שֶׁמַּתְחִילָה בְּ־שׁ.",
+      voiceText: "עַכְשָׁיו כְּתִיבָה בַּמַּחְבֶּרֶת: מ, נִי, תִּי, וְאָז מִלָּה שֶׁמַּתְחִילָה בְּשׁ.",
+      encouragement: "הַכְּתִיבָה שֶׁלְּךָ חֲשׁוּבָה וְיָפָה ✍️",
+    },
+  ],
 };
 
 function getVoices() {
@@ -122,6 +140,20 @@ async function speak(text) {
   utterance.rate = 0.9;
   utterance.pitch = 1;
   speechSynthesis.speak(utterance);
+}
+
+function getTimeGreeting() {
+  const hour = new Date().getHours();
+  if (hour >= 5 && hour < 12) {
+    return "בֹּקֶר טוֹב טוֹמִי, אֵיזֶה כֵּיף שֶׁבָּאתָ לִלְמֹד אִתִּי.";
+  }
+  if (hour >= 12 && hour < 18) {
+    return "צָהֳרַיִם טוֹבִים טוֹמִי, אֵיזֶה כֵּיף שֶׁבָּאתָ לִלְמֹד אִתִּי.";
+  }
+  if (hour >= 18 && hour <= 23) {
+    return "עֶרֶב טוֹב טוֹמִי, אֵיזֶה כֵּיף שֶׁבָּאתָ לִלְמֹד אִתִּי.";
+  }
+  return TEACHER_LINES.fallbackGreeting;
 }
 
 function readProgress() {
@@ -171,10 +203,10 @@ function currentStep() {
 
 function encouragement() {
   const lines = [
-    "אני גאה בך טוֹמִי 🌟",
-    "איזה יופי, ממשיכים לאט ובכיף 😊",
-    "כל ניסיון עוזר לך ללמוד 💛",
-    "עבודה נהדרת, טוֹמִי!",
+    "אֲנִי גֵּאָה בְּךָ טוֹמִי 🌟",
+    "אֵיזֶה יוֹפִי, מַמְשִׁיכִים לְאַט וּבְכֵיף 😊",
+    "כָּל נִסָּיוֹן עוֹזֵר לְךָ לִלְמֹד 💛",
+    "עֲבוֹדָה נֶהְדֶּרֶת, טוֹמִי!",
   ];
   return lines[Math.floor(Math.random() * lines.length)];
 }
@@ -182,6 +214,11 @@ function encouragement() {
 function resetWorksheetState() {
   selectedSyllable = null;
   matchedItems = new Set();
+}
+
+function toggleLessonEnding(show) {
+  lessonEndingOpen = show;
+  lessonEndingEl.hidden = !show;
 }
 
 function renderWorksheet(step) {
@@ -201,7 +238,7 @@ function renderWorksheet(step) {
       document.querySelectorAll(".syllable-card").forEach((card) => {
         card.classList.toggle("selected", card.dataset.syllable === selectedSyllable);
       });
-      statusMessageEl.textContent = `בחרת ${pair.syllable}. עכשיו בחר מילה מתאימה.`;
+      statusMessageEl.textContent = `בָּחַרְתָּ ${pair.syllable}. עַכְשָׁיו בְּחַר תְּמוּנָה מַתְאִימָה.`;
     });
     syllableGridEl.appendChild(syllableCard);
 
@@ -209,7 +246,7 @@ function renderWorksheet(step) {
     pictureCard.type = "button";
     pictureCard.className = "picture-card";
     pictureCard.dataset.syllable = pair.syllable;
-    pictureCard.innerHTML = `<span class="emoji">${pair.emoji}</span><span>${pair.label}</span>`;
+    pictureCard.innerHTML = `<span class="emoji">${pair.emoji}</span>`;
     pictureCard.addEventListener("click", () => checkWorksheetMatch(step, pictureCard));
     pictureGridEl.appendChild(pictureCard);
   });
@@ -218,12 +255,13 @@ function renderWorksheet(step) {
 }
 
 function updateWorksheetProgress(step) {
-  worksheetProgressEl.textContent = `התאמות: ${matchedItems.size}/${step.pairs.length}`;
+  worksheetProgressEl.textContent = `הַתְאָמָה: ${matchedItems.size}/${step.pairs.length}`;
 }
 
 function checkWorksheetMatch(step, pictureCard) {
   if (!selectedSyllable) {
-    statusMessageEl.textContent = "בחר קודם כרטיס צליל גדול, ואז תמונה.";
+    statusMessageEl.textContent = "בְּחַר קוֹדֶם כַּרְטִיס צְלִיל גָּדוֹל, וְאָז תְּמוּנָה.";
+    speak(TEACHER_LINES.clickWrong);
     return;
   }
 
@@ -234,17 +272,20 @@ function checkWorksheetMatch(step, pictureCard) {
     document
       .querySelector(`.syllable-card[data-syllable="${CSS.escape(cardSyllable)}"]`)
       ?.classList.add("matched");
-    statusMessageEl.textContent = "מעולה! התאמה נכונה.";
+    statusMessageEl.textContent = TEACHER_LINES.clickCorrect;
+    speak(TEACHER_LINES.clickCorrect);
   } else if (matchedItems.has(cardSyllable)) {
-    statusMessageEl.textContent = "כבר התאמת את הכרטיס הזה. בחר כרטיס אחר.";
+    statusMessageEl.textContent = "אֶת הַכַּרְטִיס הַזֶּה כְּבָר הִתְאַמְתָּ. נִבְחַר אַחֵר.";
+    speak(TEACHER_LINES.clickWrong);
   } else {
-    statusMessageEl.textContent = "כמעט. ננסה התאמה אחרת יחד.";
+    statusMessageEl.textContent = TEACHER_LINES.clickWrong;
+    speak(TEACHER_LINES.clickWrong);
   }
 
   updateWorksheetProgress(step);
 
   if (matchedItems.size === step.pairs.length) {
-    statusMessageEl.textContent = `${step.encouragement} אפשר ללחוץ "אני מוכן" לשלב הבא.`;
+    statusMessageEl.textContent = `${step.encouragement} אֶפְשָׁר לִלְחוֹץ "אֲנִי מוּכָן" לַשָּׁלָב הַבָּא.`;
   }
 }
 
@@ -259,9 +300,10 @@ function hideWorksheet() {
 function updateStepUi() {
   const step = currentStep();
   lessonTitleEl.textContent = lessonData.title;
-  stepCounterEl.textContent = `שלב ${currentStepIndex + 1} מתוך ${lessonData.steps.length}`;
+  stepCounterEl.textContent = `שָׁלָב ${currentStepIndex + 1} מִתּוֹךְ ${lessonData.steps.length}`;
   stepTitleEl.textContent = step.title;
   stepTextEl.textContent = step.text;
+  toggleLessonEnding(false);
 
   if (step.type === "worksheet" && step.pairs?.length) {
     resetWorksheetState();
@@ -290,73 +332,87 @@ function updateStepUi() {
   speak(step.voiceText || step.text);
 }
 
+function openLessonEndingFlow() {
+  toggleLessonEnding(true);
+  statusMessageEl.textContent = TEACHER_LINES.endingPrompt;
+  speak(TEACHER_LINES.endingPrompt);
+}
+
 function nextStep() {
   if (currentStepIndex < lessonData.steps.length - 1) {
     currentStepIndex += 1;
     updateStepUi();
   } else {
-    statusMessageEl.textContent = "סיימת את השיעור הראשון. כל הכבוד, טוֹמִי! 🎉";
-    speak("סיימת את השיעור הראשון. כל הכבוד, טוֹמִי!");
+    stepCounterEl.textContent = `סִיַּמְתָּ ${lessonData.steps.length}/${lessonData.steps.length}`;
+    statusMessageEl.textContent = "סִיַּמְתָּ אֶת הַשִּׁעוּר. כָּל הַכָּבוֹד, טוֹמִי! 🎉";
+    openLessonEndingFlow();
   }
 }
 
 async function setupRecorder() {
   if (!navigator.mediaDevices?.getUserMedia) {
-    statusMessageEl.textContent = "נוכל להמשיך גם בלי הקלטה. כשתהיה מוכן, ננסה שוב.";
+    statusMessageEl.textContent = "אֶפְשָׁר לְהַמְשִׁיךְ גַּם בְּלִי מִיקְרוֹפוֹן. נַמְשִׁיךְ בְּיַחַד.";
     return;
   }
 
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-  recorder = new MediaRecorder(stream);
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    recorder = new MediaRecorder(stream);
 
-  recorder.ondataavailable = (event) => {
-    if (event.data.size > 0) recordingChunks.push(event.data);
-  };
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) recordingChunks.push(event.data);
+    };
 
-  recorder.onstop = async () => {
-    const blob = new Blob(recordingChunks, { type: "audio/webm" });
-    recordingChunks = [];
-    activeRecordingUrl = URL.createObjectURL(blob);
-    playRecordingBtn.disabled = false;
+    recorder.onstop = async () => {
+      const blob = new Blob(recordingChunks, { type: "audio/webm" });
+      recordingChunks = [];
+      activeRecordingUrl = URL.createObjectURL(blob);
+      playRecordingBtn.disabled = false;
 
-    const dataUrl = await blobToDataURL(blob);
-    saveRecording(currentStep().id, dataUrl);
+      const dataUrl = await blobToDataURL(blob);
+      saveRecording(currentStep().id, dataUrl);
 
-    statusMessageEl.textContent = "הקלטה נשמרה. אפשר ללחוץ על שמע אותי.";
-  };
+      statusMessageEl.textContent = "הַהַקְלָטָה נִשְׁמְרָה. אֶפְשָׁר לִלְחוֹץ עַל שְׁמַע אוֹתִי.";
+    };
+  } catch (error) {
+    statusMessageEl.textContent = "אֶפְשָׁר לְהַמְשִׁיךְ גַּם בְּלִי מִיקְרוֹפוֹן. נַמְשִׁיךְ בְּיַחַד.";
+  }
 }
 
 speakAgainBtn.addEventListener("click", () => {
-  speak(lastSpokenText || currentStep()?.voiceText || currentStep()?.text || "");
+  const helpLine = TEACHER_LINES.clickHelp;
+  statusMessageEl.textContent = helpLine;
+  speak(helpLine);
 });
 
 readyBtn.addEventListener("click", () => {
+  if (lessonEndingOpen) return;
+
   if (!hasStartedLesson) {
     hasStartedLesson = true;
     updateStepUi();
     return;
   }
+
   statusMessageEl.textContent = encouragement();
   nextStep();
 });
 
 recordBtn.addEventListener("click", async () => {
-  try {
-    if (!recorder) await setupRecorder();
-    if (!recorder) return;
+  if (lessonEndingOpen) return;
 
-    if (!isRecording) {
-      recorder.start();
-      isRecording = true;
-      recordBtn.textContent = "עצור הקלטה";
-      statusMessageEl.textContent = "מקליט אותך…";
-    } else {
-      recorder.stop();
-      isRecording = false;
-      recordBtn.textContent = "הקלט אותי";
-    }
-  } catch (error) {
-    statusMessageEl.textContent = "נוכל להמשיך גם בלי הקלטה. כשתהיה מוכן, ננסה שוב.";
+  if (!recorder) await setupRecorder();
+  if (!recorder) return;
+
+  if (!isRecording) {
+    recorder.start();
+    isRecording = true;
+    recordBtn.textContent = "עֲצוֹר הַקְלָטָה";
+    statusMessageEl.textContent = "אֲנִי מַקְלִיטָה אוֹתְךָ…";
+  } else {
+    recorder.stop();
+    isRecording = false;
+    recordBtn.textContent = "הַקְלֵט אוֹתִי";
   }
 });
 
@@ -369,27 +425,42 @@ playRecordingBtn.addEventListener("click", () => {
 successBtn.addEventListener("click", () => {
   if (!hasStartedLesson || !lessonData) return;
   saveProgress(currentStep().id, "success");
-  statusMessageEl.textContent = `${encouragement()} (סומן: הצלחתי)`;
+  statusMessageEl.textContent = TEACHER_LINES.clickSuccess;
+  speak(TEACHER_LINES.clickSuccess);
+  openLessonEndingFlow();
 });
 
 hardBtn.addEventListener("click", () => {
   if (!hasStartedLesson || !lessonData) return;
   saveProgress(currentStep().id, "difficulty");
-  statusMessageEl.textContent = "זה בסדר שהיה קשה. ננסה שוב יחד 💛";
+  statusMessageEl.textContent = TEACHER_LINES.clickDifficulty;
+  speak(TEACHER_LINES.clickDifficulty);
+});
+
+lessonEndingEl.addEventListener("click", (event) => {
+  const button = event.target.closest(".ending-btn");
+  if (!button) return;
+
+  const feeling = button.dataset.feeling;
+  const response = TEACHER_LINES.endingResponses[feeling] || TEACHER_LINES.fallbackGreeting;
+  statusMessageEl.textContent = response;
+  speak(response);
 });
 
 function showWelcomeState() {
-  lessonTitleEl.textContent = "ברוך הבא";
-  stepCounterEl.textContent = "לפני שמתחילים";
-  stepTitleEl.textContent = "שלום טוֹמִי";
-  stepTextEl.textContent = "המורה תדבר קודם, ואז תלחץ על \"אני מוכן\" כדי לפתוח את התרגיל הראשון.";
+  const greeting = getTimeGreeting();
+  lessonTitleEl.textContent = "בָּרוּךְ הַבָּא";
+  stepCounterEl.textContent = "לִפְנֵי שֶׁמַּתְחִילִים";
+  stepTitleEl.textContent = "שָׁלוֹם טוֹמִי";
+  stepTextEl.textContent = "הַמּוֹרָה תְּדַבֵּר עַכְשָׁיו. כְּשֶׁתִּהְיֶה מוּכָן, לְחַץ עַל \"אֲנִי מוּכָן\".";
   choiceGridEl.hidden = true;
   choiceGridEl.innerHTML = "";
   hideWorksheet();
   writingPromptEl.hidden = true;
   playRecordingBtn.disabled = true;
-  statusMessageEl.textContent = "שלום טוֹמִי, איזה כיף שבאת ללמוד איתי.";
-  speak(statusMessageEl.textContent);
+  statusMessageEl.textContent = greeting;
+  toggleLessonEnding(false);
+  speak(greeting);
 }
 
 async function loadLesson() {
