@@ -9,7 +9,7 @@
   <body>
     <main class="app-shell">
       <header class="top-card">
-        <h1>המורה של תומי</h1>
+        <h1>המורה של טוֹמִי</h1>
         <p class="subtitle">לומדים לקרוא ולכתוב בצעדים קטנים ונעימים.</p>
       </header>
 
@@ -22,6 +22,13 @@
       <section class="step-content card" id="step-container" aria-live="polite">
         <h3 id="step-title"></h3>
         <p id="step-text"></p>
+
+        <section id="worksheet" class="worksheet" hidden>
+          <h4 id="worksheet-instruction">במה מתחילה כל מילה? נבחר יחד.</h4>
+          <p id="worksheet-progress" class="worksheet-progress"></p>
+          <div id="syllable-grid" class="syllable-grid"></div>
+          <div id="picture-grid" class="picture-grid"></div>
+        </section>
 
         <div id="choice-grid" class="choice-grid" hidden></div>
 

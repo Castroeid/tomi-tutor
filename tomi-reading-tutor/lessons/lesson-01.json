@@ -3,40 +3,24 @@
   "title": "שיעור 1: צלילים ראשונים והברות",
   "steps": [
     {
-      "id": "greeting",
-      "type": "intro",
-      "title": "שלום תומי!",
-      "text": "איזה כיף ללמוד יחד. נקשיב לצלילים, נקרא ונכתוב לאט ובשמחה.",
-      "voiceText": "שלום תומי. איזה כיף ללמוד יחד. נקשיב לצלילים, נקרא ונכתוב לאט ובשמחה.",
-      "encouragement": "אני כאן איתך בכל שלב 🌈"
-    },
-    {
-      "id": "opening-sound",
-      "type": "choices",
-      "title": "צליל פותח",
-      "text": "איזו מילה מתחילה בצליל מ? הסתכל בכרטיסים.",
-      "voiceText": "איזו מילה מתחילה בצליל מ?",
-      "choices": [
-        { "emoji": "🍌", "label": "בננה" },
-        { "emoji": "🥛", "label": "חלב" },
-        { "emoji": "🌽", "label": "תירס" },
-        { "emoji": "🐱", "label": "חתול" }
+      "id": "worksheet-opening",
+      "type": "worksheet",
+      "title": "תרגיל פתיחה",
+      "text": "במה מתחילה כל מילה? נבחר יחד.",
+      "voiceText": "במה מתחילה כל מילה? נבחר יחד.",
+      "instruction": "במה מתחילה כל מילה? נבחר יחד.",
+      "pairs": [
+        { "syllable": "מ", "emoji": "🫓", "label": "מצה" },
+        { "syllable": "סי", "emoji": "🚣", "label": "סירה" },
+        { "syllable": "ני", "emoji": "📄", "label": "נייר" },
+        { "syllable": "ש", "emoji": "☀️", "label": "שמש" },
+        { "syllable": "צ", "emoji": "🐢", "label": "צב" },
+        { "syllable": "א", "emoji": "🦁", "label": "אריה" },
+        { "syllable": "ח", "emoji": "🐌", "label": "חילזון" },
+        { "syllable": "תי", "emoji": "👜", "label": "תיק" },
+        { "syllable": "ו", "emoji": "🌹", "label": "ורד" }
       ],
-      "encouragement": "יפה מאוד! נמשיך לצליל הבא."
-    },
-    {
-      "id": "syllables",
-      "type": "choices",
-      "title": "הברות קצרות",
-      "text": "בוא נקרא יחד: סי, טי, ני, תי. בחר את ההברה שאתה שומע.",
-      "voiceText": "בוא נקרא יחד: סי, טי, ני, תי.",
-      "choices": [
-        { "emoji": "🔤", "label": "סי" },
-        { "emoji": "🔤", "label": "טי" },
-        { "emoji": "🔤", "label": "ני" },
-        { "emoji": "🔤", "label": "תי" }
-      ],
-      "encouragement": "נהדר! האוזן שלך חדה 👂"
+      "encouragement": "יופי! מצאת הרבה צלילים פותחים."
     },
     {
       "id": "missing-letter",

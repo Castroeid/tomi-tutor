@@ -1,6 +1,7 @@
 :root {
-  --bg: #fff8ef;
-  --card: #fffefb;
+  --bg: #f2e6d6;
+  --card: #fffaf2;
+  --paper: #f6ebdb;
   --primary: #ff9f6b;
   --primary-dark: #e28049;
   --accent: #8ec8b7;
@@ -17,12 +18,12 @@
 body {
   margin: 0;
   font-family: "Arial", "Heebo", sans-serif;
-  background: var(--bg);
+  background: radial-gradient(circle at top, #faefdf 0%, var(--bg) 70%);
   color: var(--text);
 }
 
 .app-shell {
-  max-width: 880px;
+  max-width: 980px;
   margin: 0 auto;
   padding: 1rem;
   display: grid;
@@ -44,6 +45,7 @@ body {
 h1,
 h2,
 h3,
+h4,
 p {
   margin: 0 0 0.5rem;
 }
@@ -54,6 +56,10 @@ h1 {
 
 .subtitle {
   font-size: 1.1rem;
+}
+
+.step-content {
+  border: 3px solid #ead5bf;
 }
 
 #step-title {
@@ -70,6 +76,67 @@ h1 {
   min-height: 1.8rem;
   font-size: 1rem;
   color: #5a4f4a;
+}
+
+.worksheet {
+  margin-top: 1rem;
+  background: var(--paper);
+  border: 2px dashed #d6bfa7;
+  border-radius: 20px;
+  padding: 1rem;
+}
+
+.worksheet h4 {
+  font-size: clamp(1.3rem, 3vw, 1.6rem);
+  margin-bottom: 0.7rem;
+}
+
+.worksheet-progress {
+  font-weight: 700;
+  color: #744b35;
+}
+
+.syllable-grid,
+.picture-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.8rem;
+}
+
+.syllable-card,
+.picture-card {
+  border: 2px solid #e0c6ad;
+  border-radius: 16px;
+  min-height: 88px;
+  background: #fffdf8;
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: #51372a;
+}
+
+.syllable-card.selected {
+  border-color: var(--primary);
+  background: #fff1e7;
+}
+
+.syllable-card.matched,
+.picture-card.matched {
+  border-color: #66b787;
+  background: #ebfff2;
+}
+
+.picture-card {
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem;
+  font-size: 1.2rem;
+}
+
+.picture-card .emoji {
+  font-size: 1.9rem;
 }
 
 .choice-grid {
@@ -142,6 +209,18 @@ h1 {
 
 .warning {
   background: var(--warning);
+}
+
+@media (max-width: 900px) {
+  .big-btn {
+    min-height: 70px;
+    font-size: 1.3rem;
+  }
+
+  .syllable-card,
+  .picture-card {
+    min-height: 98px;
+  }
 }
 
 @media (max-width: 640px) {
