@@ -8,18 +8,57 @@
   </head>
   <body>
     <main class="app-shell">
-      <header class="top-card">
-        <h1>הַמּוֹרָה שֶׁל טוֹמִי</h1>
-        <p class="subtitle">לוֹמְדִים לִקְרוֹא וְלִכְתּוֹב בִּצְעָדִים קְטַנִּים וּנְעִימִים.</p>
+      <header class="top-card soft-banner">
+        <p class="banner-kicker">מַסַּע לְמִידָה רָגוּעַ</p>
+        <h1>הַמּוֹרֶה שֶׁל טוֹמִי</h1>
+        <p class="subtitle">לוֹמְדִים בְּצַעַד קָטָן, בְּלֵב גָּדוֹל, וּבְבִטָּחוֹן.</p>
       </header>
 
-      <section class="lesson-progress card" aria-live="polite">
+      <section id="entry-screen" class="entry-screen card" aria-live="polite">
+        <div class="avatar-area" aria-label="הָאַוָּטָאר שֶׁל לִיאוֹ">
+          <div class="avatar-face" role="img" aria-label="לִיאוֹ">🦁✨</div>
+          <div>
+            <h2>לִיאוֹ</h2>
+            <p>מוֹרֶה חַם, אַמִּיץ וְחָבֵר לְדֶרֶךְ.</p>
+          </div>
+        </div>
+        <p class="entry-text">כְּשֶׁתִּלְחַץ עַל הַכַּפְתּוֹר, נַתְחִיל יַחַד בַּשִּׁעוּר.</p>
+        <button id="enter-btn" class="big-btn primary entry-btn">הִכָּנֵס</button>
+      </section>
+
+      <section id="emotion-flow" class="emotion-flow card" hidden>
+        <h3 id="emotion-question">אֵיךְ אַתָּה מַרְגִּישׁ עַכְשָׁיו?</h3>
+        <div id="mood-grid" class="ending-grid">
+          <button type="button" class="big-btn mood-btn" data-mood="happy">שָׂמֵחַ</button>
+          <button type="button" class="big-btn mood-btn" data-mood="tired">קְצָת עָיֵף</button>
+          <button type="button" class="big-btn mood-btn" data-mood="hard">קָשֶׁה לִי</button>
+          <button type="button" class="big-btn mood-btn" data-mood="ready">מוּכָן לִלְמֹד</button>
+        </div>
+
+        <section class="voice-reflection">
+          <h4>מָה הָיָה לְךָ קַל אוֹ קָשֶׁה?</h4>
+          <div class="button-row single">
+            <button id="reflection-record-btn" class="big-btn">הַקְלֵט תְּשׁוּבָה</button>
+          </div>
+          <p id="reflection-status" class="status-message"></p>
+          <div class="button-row single">
+            <button id="start-lesson-btn" class="big-btn success">נַתְחִיל לִלְמֹד</button>
+          </div>
+        </section>
+      </section>
+
+      <section class="lesson-progress card" aria-live="polite" hidden id="lesson-progress">
         <h2 id="lesson-title">טוֹעֵן שִׁעוּר…</h2>
         <p id="step-counter"></p>
         <p id="status-message" class="status-message"></p>
       </section>
 
-      <section class="step-content card" id="step-container" aria-live="polite">
+      <section class="exercise-tracker card" id="exercise-tracker" hidden>
+        <h3>תַּרְגִּילִים בַּשִּׁעוּר</h3>
+        <div id="exercise-list" class="exercise-list"></div>
+      </section>
+
+      <section class="step-content card" id="step-container" aria-live="polite" hidden>
         <h3 id="step-title"></h3>
         <p id="step-text"></p>
 
@@ -35,22 +74,12 @@
         <div id="writing-prompt" class="writing-prompt" hidden>
           <p>✍️ כְּתוֹב בַּמַּחְבֶּרֶת שֶׁלְּךָ, וּכְשֶׁתְּסַיֵּם לְחַץ "הִצְלַחְתִּי".</p>
         </div>
-
-        <section id="lesson-ending" class="lesson-ending" hidden>
-          <h4>אֵיךְ הָיָה לְךָ הַיּוֹם?</h4>
-          <div class="ending-grid">
-            <button type="button" class="big-btn ending-btn" data-feeling="easy">קַל</button>
-            <button type="button" class="big-btn ending-btn" data-feeling="ok">בְּסֵדֶר</button>
-            <button type="button" class="big-btn ending-btn" data-feeling="hard">קָשֶׁה</button>
-            <button type="button" class="big-btn ending-btn" data-feeling="fun">כֵּיף</button>
-          </div>
-        </section>
       </section>
 
-      <section class="controls card">
+      <section class="controls card" id="lesson-controls" hidden>
         <div class="button-row">
           <button id="speak-again" class="big-btn">שְׁמַע שׁוּב</button>
-          <button id="ready-btn" class="big-btn primary">אֲנִי מוּכָן</button>
+          <button id="ready-btn" class="big-btn primary">הַשְׁלַב הַבָּא</button>
         </div>
         <div class="button-row">
           <button id="record-btn" class="big-btn">הַקְלֵט אוֹתִי</button>

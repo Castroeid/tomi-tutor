@@ -38,8 +38,15 @@ body {
   box-shadow: var(--shadow);
 }
 
-.top-card {
-  background: linear-gradient(135deg, #ffe5c8, #fff3e5);
+.soft-banner {
+  background: linear-gradient(135deg, #ffe8ca, #eef9f3);
+  border: 1px solid #f2d9ba;
+}
+
+.banner-kicker {
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: #7b6042;
 }
 
 h1,
@@ -56,6 +63,49 @@ h1 {
 
 .subtitle {
   font-size: 1.1rem;
+}
+
+.entry-screen {
+  display: grid;
+  gap: 1rem;
+  border: 2px solid #e7d1b5;
+}
+
+.avatar-area {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: linear-gradient(120deg, #f8f4ff, #ecfff7);
+  border-radius: 18px;
+  padding: 0.9rem;
+}
+
+.avatar-face {
+  min-width: 88px;
+  min-height: 88px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 2rem;
+  background: radial-gradient(circle at 30% 20%, #fff7d7 0, #ffd8a8 55%, #ffc087 100%);
+  box-shadow: inset 0 0 0 3px #fff3e1;
+}
+
+.entry-btn {
+  min-height: 76px;
+  font-size: clamp(1.6rem, 4vw, 2rem);
+}
+
+.emotion-flow {
+  border: 2px solid #e9d2ba;
+}
+
+.voice-reflection {
+  margin-top: 1rem;
+  background: #fff5ec;
+  border-radius: 18px;
+  border: 1px solid #edd9c4;
+  padding: 0.9rem;
 }
 
 .step-content {
@@ -76,6 +126,47 @@ h1 {
   min-height: 1.8rem;
   font-size: 1rem;
   color: #5a4f4a;
+}
+
+.exercise-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.exercise-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.55rem;
+  border: 1px solid #ecd7bf;
+  border-radius: 14px;
+  background: #fff6ed;
+  padding: 0.55rem 0.7rem;
+}
+
+.exercise-item.done {
+  background: #effff4;
+  border-color: #a8dbba;
+}
+
+.exercise-index {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 1px solid #ddc6ac;
+  font-weight: 700;
+}
+
+.complete-badge {
+  font-size: 0.86rem;
+  font-weight: 700;
+  background: #dcf6e5;
+  color: #27623f;
+  border-radius: 999px;
+  padding: 0.25rem 0.6rem;
 }
 
 .worksheet {
@@ -180,6 +271,10 @@ h1 {
   gap: 0.6rem;
 }
 
+.button-row.single {
+  grid-template-columns: 1fr;
+}
+
 .big-btn {
   border: none;
   border-radius: 18px;
@@ -211,6 +306,19 @@ h1 {
   background: var(--warning);
 }
 
+.mood-btn {
+  min-height: 78px;
+  font-size: 1.45rem;
+  background: #fffaf4;
+  border: 2px solid #efceb2;
+}
+
+.ending-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
 @media (max-width: 900px) {
   .big-btn {
     min-height: 70px;
@@ -224,39 +332,17 @@ h1 {
 }
 
 @media (max-width: 640px) {
-  .button-row {
+  .button-row,
+  .ending-grid {
     grid-template-columns: 1fr;
+  }
+
+  .avatar-area {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .big-btn {
     font-size: 1.35rem;
   }
-}
-
-
-.lesson-ending {
-  margin-top: 1rem;
-  background: #fff2e4;
-  border: 2px solid #f0ccb0;
-  border-radius: 18px;
-  padding: 1rem;
-}
-
-.lesson-ending h4 {
-  font-size: clamp(1.4rem, 3.2vw, 1.9rem);
-  margin-bottom: 0.9rem;
-  color: #5d3d2d;
-}
-
-.ending-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(150px, 1fr));
-  gap: 0.75rem;
-}
-
-.ending-btn {
-  min-height: 86px;
-  font-size: 1.6rem;
-  background: #fffaf4;
-  border: 2px solid #efceb2;
 }
