@@ -48,6 +48,7 @@ let lessonData = { title: "", exercises: [] };
 let currentExerciseIndex = 0;
 let selectedSound = null;
 let matchedItems = new Set();
+let currentChoiceItemIndex = 0;
 let lastSpokenText = "";
 let hasHebrewVoice = true;
 
@@ -208,6 +209,69 @@ function hideExerciseSubAreas() {
   elements.writingArea.hidden = true;
 }
 
+function getChoiceItems(exercise) {
+  if (Array.isArray(exercise.items) && exercise.items.length > 0) {
+    return exercise.items;
+  }
+
+  return [
+    {
+      ...exercise,
+      prompt: exercise.prompt || exercise.text,
+      expectedAnswer: exercise.expectedAnswer || exercise.answer,
+      distractors: exercise.distractors || exercise.options || [],
+    },
+  ];
+}
+
+function updateChoicePrompt(exercise, item, index, total) {
+  const promptParts = [item.prompt || exercise.text];
+  if (item.emoji) promptParts.push(item.emoji);
+  if (total > 1) promptParts.push(`(${index + 1}/${total})`);
+  elements.exerciseText.textContent = promptParts.join(" ");
+}
+
+function getFeedbackByExerciseType(exerciseType, isCorrect) {
+  if (exerciseType === "same-opening-sound") {
+    return isCorrect
+      ? "נָכוֹן מְאֹד. שָׁמַעְתָּ אֶת הַצְּלִיל הָרִאשׁוֹן בְּדִיּוּק."
+      : "נִסָּיוֹן יָפֶה. שִׁים לֵב — כָּאן הַצְּלִיל הָרִאשׁוֹן שׁוֹנֶה, כִּי הַנִּקּוּד שׁוֹנֶה.";
+  }
+
+  return isCorrect ? "כָּל הַכָּבוֹד!" : "כְּדַאי לְנַסּוֹת שׁוּב.";
+}
+
+function renderChoiceItem(exercise) {
+  const items = getChoiceItems(exercise);
+  const item = items[currentChoiceItemIndex];
+  if (!item) return;
+
+  const correctAnswer = item.expectedAnswer;
+  const choices = [...item.distractors];
+  if (!choices.includes(correctAnswer)) choices.push(correctAnswer);
+
+  updateChoicePrompt(exercise, item, currentChoiceItemIndex, items.length);
+  elements.choiceArea.innerHTML = "";
+
+  choices.forEach((option) => {
+    const optionBtn = document.createElement("button");
+    optionBtn.type = "button";
+    optionBtn.className = "choice-card";
+    optionBtn.textContent = option;
+    optionBtn.addEventListener("click", () => {
+      const isCorrect = option === correctAnswer;
+      elements.statusMessage.textContent = getFeedbackByExerciseType(exercise.type, isCorrect);
+      if (!isCorrect) return;
+
+      if (currentChoiceItemIndex < items.length - 1) {
+        currentChoiceItemIndex += 1;
+        renderChoiceItem(exercise);
+      }
+    });
+    elements.choiceArea.appendChild(optionBtn);
+  });
+}
+
 function renderMatchExercise(exercise) {
   selectedSound = null;
   matchedItems = new Set();
@@ -235,7 +299,8 @@ function renderMatchExercise(exercise) {
     pictureButton.type = "button";
     pictureButton.className = "picture-card";
     pictureButton.dataset.sound = pair.sound;
-    pictureButton.innerHTML = `<span>${pair.emoji}</span><small>${pair.label}</small>`;
+    pictureButton.innerHTML = `<span>${pair.emoji}</span>`;
+    pictureButton.setAttribute("aria-label", pair.displayWordWithNikud || pair.word || "");
     pictureButton.addEventListener("click", () => {
       if (!selectedSound) {
         elements.statusMessage.textContent = "בְּחַר צְלִיל וְאָז תְּמוּנָה.";
@@ -261,22 +326,9 @@ function renderMatchExercise(exercise) {
 }
 
 function renderChoiceExercise(exercise) {
+  currentChoiceItemIndex = 0;
   elements.choiceArea.hidden = false;
-  elements.choiceArea.innerHTML = "";
-  exercise.options.forEach((option) => {
-    const optionBtn = document.createElement("button");
-    optionBtn.type = "button";
-    optionBtn.className = "choice-card";
-    optionBtn.textContent = option;
-    optionBtn.addEventListener("click", () => {
-      if (option === exercise.answer) {
-        elements.statusMessage.textContent = "כָּל הַכָּבוֹד!";
-      } else {
-        elements.statusMessage.textContent = "כְּדַאי לְנַסּוֹת שׁוּב.";
-      }
-    });
-    elements.choiceArea.appendChild(optionBtn);
-  });
+  renderChoiceItem(exercise);
 }
 
 function openExercise() {
