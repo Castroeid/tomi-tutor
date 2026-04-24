@@ -55,6 +55,19 @@ let preLessonRecorder = null;
 let preLessonChunks = [];
 let isPreLessonRecording = false;
 
+function getAiConversationHelper() {
+  if (window.AIConversation && typeof window.AIConversation.createLeoReply === "function") {
+    return window.AIConversation;
+  }
+  return null;
+}
+
+function setTalkStatusFromAi(context) {
+  const helper = getAiConversationHelper();
+  if (!helper) return;
+  elements.talkStatus.textContent = helper.createLeoReply(context);
+}
+
 function defaultProgress() {
   return {
     completedExercises: [],
@@ -362,7 +375,11 @@ async function preparePreLessonRecorder() {
       saveProgress();
       saveRecordingMetadata(metadata);
       preLessonChunks = [];
-      elements.talkStatus.textContent = "הַהַקְלָטָה נִשְׁמְרָה.";
+      setTalkStatusFromAi({
+        type: "recording-saved",
+        recordingSize: blob.size,
+        completedExercises: progress.completedExercises.length,
+      });
       renderParentPanel();
     };
 
@@ -396,6 +413,7 @@ elements.enterBtn.addEventListener("click", async () => {
 elements.talkYesBtn.addEventListener("click", async () => {
   elements.preLesson.hidden = true;
   elements.talkPanel.hidden = false;
+  setTalkStatusFromAi({ type: "conversation-start" });
   await speak("מָה אַתָּה רוֹצֶה לְסַפֵּר לִי?");
 });
 
