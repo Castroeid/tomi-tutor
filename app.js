@@ -26,6 +26,9 @@ const elements = {
   readArea: document.getElementById("read-area"),
   readSyllables: document.getElementById("read-syllables"),
   writingArea: document.getElementById("writing-area"),
+  writingInstruction: document.getElementById("writing-instruction"),
+  writingExample: document.getElementById("writing-example"),
+  writingInputs: document.getElementById("writing-inputs"),
   speakAgainBtn: document.getElementById("speak-again"),
   successBtn: document.getElementById("success-btn"),
   hardBtn: document.getElementById("hard-btn"),
@@ -33,6 +36,10 @@ const elements = {
   endingBtns: document.querySelectorAll(".ending-btn"),
   parentPanel: document.getElementById("parent-panel"),
   parentStats: document.getElementById("parent-stats"),
+  parentToggleBtn: document.getElementById("parent-toggle-btn"),
+  parentContent: document.getElementById("parent-content"),
+  parentProgressLabel: document.getElementById("parent-progress-label"),
+  parentProgressFill: document.getElementById("parent-progress-fill"),
 };
 
 const STORAGE_KEYS = {
@@ -41,14 +48,18 @@ const STORAGE_KEYS = {
 };
 
 const FALLBACK_VOICE_WARNING = "לא נמצא קול עברי במכשיר הזה.";
-const NEXT_EXERCISE_LINE = "כָּל הַכָּבוֹד טוֹמִי. עָבַרְנוּ לַתַּרְגִּיל הַבָּא.";
+const NEXT_EXERCISE_LINE = "כָּל הַכָּבוֹד טוֹמִי, סִיַּמְתָּ אֶת הַתַּרְגִּיל.";
 const ALMOST_DONE_LINE = "כִּמְעַט סִיַּמְנוּ. נִשְׁאַרוּ עוֹד כַּמָּה כַּרְטִיסִים.";
+const INTERACTION_LINE = "יָפֶה, נַמְשִׁיךְ.";
+const CORRECT_LINE = "כָּל הַכָּבוֹד!";
+const WRONG_LINE = "לֹא נָכוֹן, נְנַסֶּה שׁוּב.";
 
 let lessonData = { title: "", exercises: [] };
 let currentExerciseIndex = 0;
 let selectedSound = null;
 let matchedItems = new Set();
 let currentChoiceItemIndex = 0;
+let writingDrafts = [];
 let lastSpokenText = "";
 let hasHebrewVoice = true;
 
@@ -126,7 +137,10 @@ async function speak(text) {
   lastSpokenText = text;
   speechSynthesis.cancel();
   const voices = await getVoices();
-  const hebrewVoice = voices.find((voice) => voice.lang?.toLowerCase().startsWith("he"));
+  const hebrewVoices = voices.filter((voice) => voice.lang?.toLowerCase().startsWith("he"));
+  const hebrewVoice = hebrewVoices
+    .slice()
+    .sort((a, b) => scoreVoice(b) - scoreVoice(a))[0];
   hasHebrewVoice = Boolean(hebrewVoice);
 
   if (!hasHebrewVoice) {
@@ -136,9 +150,19 @@ async function speak(text) {
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "he-IL";
-  utterance.rate = 0.92;
+  utterance.rate = 0.85;
+  utterance.pitch = 0.92;
   if (hebrewVoice) utterance.voice = hebrewVoice;
   speechSynthesis.speak(utterance);
+}
+
+function scoreVoice(voice) {
+  const name = (voice?.name || "").toLowerCase();
+  let score = 0;
+  if (name.includes("male") || name.includes("man") || name.includes("guy") || name.includes("גבר")) score += 4;
+  if (name.includes("carmit") || name.includes("female") || name.includes("woman")) score -= 2;
+  if (voice?.localService) score += 1;
+  return score;
 }
 
 function currentExercise() {
@@ -168,6 +192,8 @@ function getExerciseStatus(index) {
   if (exercise.type === "future") return "future";
   if (isExerciseCompleted(exercise.id)) return "done";
   if (index === currentExerciseIndex) return "current";
+  if (index < currentExerciseIndex) return "locked";
+  if (index === currentExerciseIndex + 1) return "next";
   return "future";
 }
 
@@ -181,16 +207,27 @@ function renderLessonMenu() {
     card.type = "button";
     card.className = `exercise-card ${status}`;
 
-    const statusLabel = status === "done" ? "הֻשְׁלַם ✓" : status === "current" ? "עַכְשָׁיו" : "בַּקָּרוֹב";
+    const statusLabel =
+      status === "done"
+        ? "הֻשְׁלַם ✓"
+        : status === "current"
+          ? "עַכְשָׁיו"
+          : status === "next"
+            ? "הַתַּרְגִּיל הַבָּא"
+            : status === "locked"
+              ? "נָעוּל"
+              : "בַּקָּרוֹב";
 
     card.innerHTML = `
       <span class="exercise-name">${exercise.title}</span>
       <span class="exercise-badge">${statusLabel}</span>
     `;
 
+    card.disabled = status === "locked" || status === "future" || status === "done";
     card.addEventListener("click", () => {
-      if (exercise.type === "future") {
+      if (exercise.type === "future" || status === "locked" || status === "done") {
         elements.statusMessage.textContent = "מִשְׂחָק קָטָן בַּסּוֹף — בַּקָּרוֹב";
+        speak(INTERACTION_LINE);
         return;
       }
       currentExerciseIndex = index;
@@ -207,6 +244,35 @@ function hideExerciseSubAreas() {
   elements.choiceArea.hidden = true;
   elements.readArea.hidden = true;
   elements.writingArea.hidden = true;
+}
+
+function addClickFeedback(target) {
+  const button = target?.closest?.("button");
+  if (!button) return;
+  button.classList.add("button-clicked");
+  setTimeout(() => button.classList.remove("button-clicked"), 150);
+}
+
+function leoReaction(type) {
+  const line = type === "correct" ? CORRECT_LINE : type === "wrong" ? WRONG_LINE : INTERACTION_LINE;
+  elements.statusMessage.textContent = line;
+  speak(line);
+}
+
+function resetExerciseState() {
+  selectedSound = null;
+  matchedItems = new Set();
+  currentChoiceItemIndex = 0;
+  writingDrafts = [];
+  elements.matchInstruction.textContent = "";
+  elements.matchProgress.textContent = "";
+  elements.soundGrid.innerHTML = "";
+  elements.pictureGrid.innerHTML = "";
+  elements.choiceArea.innerHTML = "";
+  elements.readSyllables.textContent = "";
+  elements.writingInstruction.textContent = "";
+  elements.writingExample.textContent = "";
+  elements.writingInputs.innerHTML = "";
 }
 
 function getChoiceItems(exercise) {
@@ -238,7 +304,7 @@ function getFeedbackByExerciseType(exerciseType, isCorrect) {
       : "נִסָּיוֹן יָפֶה. שִׁים לֵב — כָּאן הַצְּלִיל הָרִאשׁוֹן שׁוֹנֶה, כִּי הַנִּקּוּד שׁוֹנֶה.";
   }
 
-  return isCorrect ? "כָּל הַכָּבוֹד!" : "כְּדַאי לְנַסּוֹת שׁוּב.";
+  return isCorrect ? CORRECT_LINE : WRONG_LINE;
 }
 
 function renderChoiceItem(exercise) {
@@ -261,6 +327,7 @@ function renderChoiceItem(exercise) {
     optionBtn.addEventListener("click", () => {
       const isCorrect = option === correctAnswer;
       elements.statusMessage.textContent = getFeedbackByExerciseType(exercise.type, isCorrect);
+      leoReaction(isCorrect ? "correct" : "wrong");
       if (!isCorrect) return;
 
       if (currentChoiceItemIndex < items.length - 1) {
@@ -292,6 +359,7 @@ function renderMatchExercise(exercise) {
         card.classList.toggle("selected", card.dataset.sound === selectedSound);
       });
       elements.statusMessage.textContent = `בָּחַרְתָּ ${pair.sound}. עַכְשָׁיו בְּחַר תְּמוּנָה.`;
+      leoReaction("interaction");
     });
     elements.soundGrid.appendChild(soundButton);
 
@@ -304,6 +372,7 @@ function renderMatchExercise(exercise) {
     pictureButton.addEventListener("click", () => {
       if (!selectedSound) {
         elements.statusMessage.textContent = "בְּחַר צְלִיל וְאָז תְּמוּנָה.";
+        leoReaction("interaction");
         return;
       }
 
@@ -311,9 +380,9 @@ function renderMatchExercise(exercise) {
         matchedItems.add(pair.sound);
         pictureButton.classList.add("matched");
         elements.soundGrid.querySelector(`[data-sound="${CSS.escape(pair.sound)}"]`)?.classList.add("matched");
-        elements.statusMessage.textContent = "נָכוֹן!";
+        leoReaction("correct");
       } else {
-        elements.statusMessage.textContent = "נִסָּיוֹן יָפֶה, בּוֹא נְנַסֶּה שׁוּב.";
+        leoReaction("wrong");
       }
 
       elements.matchProgress.textContent = `${matchedItems.size}/${exercise.pairs.length}`;
@@ -331,7 +400,30 @@ function renderChoiceExercise(exercise) {
   renderChoiceItem(exercise);
 }
 
+function renderWritingExercise(exercise) {
+  elements.writingArea.hidden = false;
+  const modelWord = exercise.modelWord || exercise.displayWordWithNikud || exercise.word || "שָׁ";
+  const instruction = exercise.writingInstruction || `✍️ כְּתוֹב אֶת ${modelWord} שָׁלוֹשׁ פְּעָמִים.`;
+  writingDrafts = ["", "", ""];
+  elements.writingInstruction.textContent = instruction;
+  elements.writingExample.textContent = `דֻּגְמָה: ${modelWord}`;
+  elements.writingInputs.innerHTML = "";
+
+  writingDrafts.forEach((_, index) => {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "writing-input";
+    input.placeholder = `${index + 1}`;
+    input.setAttribute("aria-label", `כְּתִיבָה ${index + 1}`);
+    input.addEventListener("input", (event) => {
+      writingDrafts[index] = event.target.value;
+    });
+    elements.writingInputs.appendChild(input);
+  });
+}
+
 function openExercise() {
+  resetExerciseState();
   const exercise = currentExercise();
   elements.exercisePanel.hidden = false;
   elements.exerciseTitle.textContent = exercise.title;
@@ -353,7 +445,7 @@ function openExercise() {
   }
 
   if (exercise.type === "writing-prompt") {
-    elements.writingArea.hidden = false;
+    renderWritingExercise(exercise);
   }
 
   speak(exercise.voiceText || exercise.text);
@@ -373,11 +465,14 @@ function canCompleteCurrentExercise() {
 }
 
 function moveToNextExercise() {
-  const nextIndex = lessonData.exercises.findIndex((exercise, index) => index > currentExerciseIndex && exercise.type !== "future" && !isExerciseCompleted(exercise.id));
+  const nextIndex = lessonData.exercises.findIndex(
+    (exercise, index) => index > currentExerciseIndex && exercise.type !== "future" && !isExerciseCompleted(exercise.id)
+  );
   if (nextIndex !== -1) {
     currentExerciseIndex = nextIndex;
     renderLessonMenu();
     openExercise();
+    elements.statusMessage.textContent = "הַתַּרְגִּיל הַבָּא מוּכָן.";
   }
 
   if (allRealExercisesCompleted()) {
@@ -392,10 +487,21 @@ function renderParentPanel() {
   const difficult = progress.difficultExercises.length;
   const recordings = getSavedRecordingsCount();
   const lastMood = progress.lastMood || "—";
+  const total = lessonData.exercises.filter((exercise) => exercise.type !== "future").length || 1;
+  const completedPercent = Math.round((completed / total) * 100);
+  const completedNames = lessonData.exercises
+    .filter((exercise) => progress.completedExercises.includes(exercise.id))
+    .map((exercise) => `✓ ${exercise.title}`);
+  const difficultNames = lessonData.exercises
+    .filter((exercise) => progress.difficultExercises.includes(exercise.id))
+    .map((exercise) => `⚠ ${exercise.title}`);
+
+  elements.parentProgressLabel.textContent = `הִתְקַדְּמוּת: ${completedPercent}%`;
+  elements.parentProgressFill.style.width = `${completedPercent}%`;
 
   elements.parentStats.innerHTML = `
-    <li>תַּרְגִּילִים שֶׁהֻשְׁלְמוּ: ${completed}</li>
-    <li>תַּרְגִּילִים מְאַתְגְּרִים: ${difficult}</li>
+    <li>תַּרְגִּילִים שֶׁהֻשְׁלְמוּ: ${completed}<br>${completedNames.join("<br>") || "—"}</li>
+    <li>תַּרְגִּילִים מְאַתְגְּרִים: ${difficult}<br>${difficultNames.join("<br>") || "—"}</li>
     <li>מַצָּב רוּחַ אַחֲרוֹן: ${lastMood}</li>
     <li>מִסְפַּר הַקְלָטוֹת שֶׁנִּשְׁמְרוּ: ${recordings}</li>
   `;
@@ -459,7 +565,7 @@ function showLessonFlow() {
 elements.enterBtn.addEventListener("click", async () => {
   elements.entryScreen.hidden = true;
   elements.preLesson.hidden = false;
-  await speak("שָׁלוֹם טוֹמִי. בּוֹא נַתְחִיל יַחַד.");
+  await speak("שָׁלוֹם טוֹמִי, אֲנִי לִיאוֹ, הַמּוֹרֶה הַפְּרָטִי שֶׁלְּךָ.");
 });
 
 elements.talkYesBtn.addEventListener("click", async () => {
@@ -471,11 +577,13 @@ elements.talkYesBtn.addEventListener("click", async () => {
 
 elements.talkNoBtn.addEventListener("click", () => {
   elements.preLesson.hidden = true;
+  leoReaction("interaction");
   showLessonFlow();
 });
 
 elements.toLessonBtn.addEventListener("click", () => {
   elements.talkPanel.hidden = true;
+  leoReaction("interaction");
   showLessonFlow();
 });
 
@@ -501,7 +609,8 @@ elements.speakAgainBtn.addEventListener("click", () => speak(lastSpokenText));
 
 elements.hardBtn.addEventListener("click", () => {
   markDifficult(currentExercise().id);
-  elements.statusMessage.textContent = "זֶה בְּסֵדֶר. נִתְאַמֵּן עוֹד פַּעַם.";
+  elements.statusMessage.textContent = WRONG_LINE;
+  leoReaction("wrong");
   renderParentPanel();
 });
 
@@ -531,6 +640,15 @@ elements.endingBtns.forEach((button) => {
     speak("תּוֹדָה שֶׁשִּׁתַּפְתָּ אוֹתִי.");
   });
 });
+
+elements.parentToggleBtn.addEventListener("click", () => {
+  const isExpanded = elements.parentToggleBtn.getAttribute("aria-expanded") === "true";
+  elements.parentToggleBtn.setAttribute("aria-expanded", String(!isExpanded));
+  elements.parentContent.hidden = isExpanded;
+  leoReaction("interaction");
+});
+
+document.addEventListener("click", (event) => addClickFeedback(event.target), true);
 
 async function setAvatar() {
   const imageUrl = "assets/leo/leo-avatar.png";
