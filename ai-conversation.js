@@ -1,48 +1,48 @@
 (function attachAiConversation(globalScope) {
-  const OPENING_LINES = [
-    "אֵיזֶה כֵּיף לְדַבֵּר אִתְּךָ. אֲנִי מַקְשִׁיב.",
-    "אֲנִי כָּאן אִתְּךָ, אֶפְשָׁר לְסַפֵּר לִי לְאַט.",
-    "מְעוּלֶּה שֶׁבָּחַרְתָּ לְדַבֵּר אִתִּי לִפְנֵי הַשִּׁעוּר."
-  ];
-
-  const AFTER_RECORDING_LINES = [
-    "תּוֹדָה שֶׁשִּׁתַּפְתָּ אוֹתִי. עַכְשָׁיו נַמְשִׁיךְ לַשִּׁעוּר.",
-    "שַׂמְתִּי לֵב לַמַּאֲמָץ שֶׁלְּךָ. בּוֹא נַמְשִׁיךְ יַחַד.",
-    "יוֹפִי שֶׁל שִׁתּוּף. נַעֲבוֹר לַתַּרְגִּיל הַבָּא?"
-  ];
-
-  function pickByNumber(list, value) {
-    if (!list.length) return "";
-    const index = Math.abs(Number(value || 0)) % list.length;
-    return list[index];
-  }
-
   function createLeoReply(context) {
     const childText = String(context?.recognizedText || "").trim();
     if (context?.type === "pre_lesson" && childText) {
-      if (childText.includes("עייף")) {
-        return "שָׁמַעְתִּי שֶׁאַתָּה עָיֵף. בּוֹא נִנְשֹׁם וְנָנוּחַ דַּקָּה.";
+      if (childText.includes("לא רוצה") || childText.includes("עזוב") || childText.includes("די")) {
+        return {
+          reply: "אֲנִי מֵבִין. לֹא חַיָּבִים הַרְבֵּה. נַעֲשֶׂה רַק כַּרְטִיס אֶחָד אוֹ מִשְׂחָק קָטָן?",
+          emotion: "resistant",
+          nextAction: "offer_choice",
+        };
       }
-      if (childText.includes("קשה")) {
-        return "זֶה בֶּאֱמֶת קָשֶׁה לִפְעָמִים. נַתְחִיל בְּצַעַד קָטָן יַחַד.";
+      if (childText.includes("אני יודע")) {
+        return {
+          reply: "מְעוּלֶּה, אֲנִי שָׂמֵחַ שֶׁאַתָּה יוֹדֵעַ. בּוֹא תַּרְאֶה לִי רַק דֻּגְמָה קְטַנָּה אַחַת.",
+          emotion: "proud",
+          nextAction: "continue",
+        };
       }
-      if (childText.includes("לא רוצה")) {
-        return "זֶה בְּסֵדֶר לְהַרְגִּישׁ כָּךְ. נַעֲשֶׂה רַק נִסָּיוֹן קָטָן בְּיַחַד.";
+      if (childText.includes("קשה") || childText.includes("מעצבן")) {
+        return {
+          reply: "זֶה מוּבָן לְגַמְרֵי. נְפַשֵּׁט לְצַעַד קָטָן וְאִם תִּרְצֶה נַעֲשֶׂה הַפְסָקָה קְצָרָה.",
+          emotion: "frustrated",
+          nextAction: "simplify",
+        };
       }
-      return `תּוֹדָה שֶׁסִּפַּרְתָּ לִי: ${childText}. אֲנִי אִתְּךָ.`;
-    }
-
-    if (context?.type === "recording-saved") {
-      const sizeHint = context.recordingSize || 0;
-      const line = pickByNumber(AFTER_RECORDING_LINES, sizeHint);
-      return `${line} שָׁמַרְתִּי אֶת הַהַקְלָטָה לְלוּחַ הַהוֹרִים.`;
+      return {
+        reply: `שָׁמַעְתִּי אוֹתְךָ: ${childText}. בּוֹא נַעֲשֶׂה עַכְשָׁיו צַעַד קָטָן יַחַד.`,
+        emotion: "ready",
+        nextAction: "encourage",
+      };
     }
 
     if (context?.type === "conversation-start") {
-      return pickByNumber(OPENING_LINES, Date.now());
+      return {
+        reply: "מְעוּלֶּה, אֲנִי מַקְשִׁיב לְךָ.",
+        emotion: "ready",
+        nextAction: "continue",
+      };
     }
 
-    return "אֲנִי כָּאן בִּשְׁבִילְךָ. נַמְשִׁיךְ צַעַד־צַעַד.";
+    return {
+      reply: "אֲנִי כָּאן בִּשְׁבִילְךָ. נַעֲשֶׂה צַעַד קָטָן יַחַד.",
+      emotion: "unknown",
+      nextAction: "encourage",
+    };
   }
 
   globalScope.AIConversation = {
