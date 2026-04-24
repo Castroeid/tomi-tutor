@@ -10,7 +10,6 @@ const worksheetInstructionEl = document.getElementById("worksheet-instruction");
 const syllableGridEl = document.getElementById("syllable-grid");
 const pictureGridEl = document.getElementById("picture-grid");
 const worksheetProgressEl = document.getElementById("worksheet-progress");
-const lessonEndingEl = document.getElementById("lesson-ending");
 
 const speakAgainBtn = document.getElementById("speak-again");
 const readyBtn = document.getElementById("ready-btn");
@@ -19,36 +18,46 @@ const playRecordingBtn = document.getElementById("play-recording-btn");
 const successBtn = document.getElementById("success-btn");
 const hardBtn = document.getElementById("hard-btn");
 
+const entryScreenEl = document.getElementById("entry-screen");
+const enterBtn = document.getElementById("enter-btn");
+const emotionFlowEl = document.getElementById("emotion-flow");
+const reflectionRecordBtn = document.getElementById("reflection-record-btn");
+const reflectionStatusEl = document.getElementById("reflection-status");
+const startLessonBtn = document.getElementById("start-lesson-btn");
+const lessonProgressEl = document.getElementById("lesson-progress");
+const lessonControlsEl = document.getElementById("lesson-controls");
+const stepContainerEl = document.getElementById("step-container");
+const exerciseTrackerEl = document.getElementById("exercise-tracker");
+const exerciseListEl = document.getElementById("exercise-list");
+
 let lessonData = null;
 let currentStepIndex = 0;
-let recorder = null;
-let recordingChunks = [];
-let activeRecordingUrl = null;
-let isRecording = false;
-let hasStartedLesson = false;
 let lastSpokenText = "";
 let selectedSyllable = null;
 let matchedItems = new Set();
-let lessonEndingOpen = false;
+let activeRecordingUrl = null;
+let isLessonRecording = false;
+let isReflectionRecording = false;
+
+let lessonRecorder = null;
+let reflectionRecorder = null;
+let lessonChunks = [];
+let reflectionChunks = [];
 
 const STORAGE_KEYS = {
-  progress: "tomiTutorProgress",
+  session: "tomiTutorSession",
   recordings: "tomiTutorRecordings",
 };
 
-const TEACHER_LINES = {
-  fallbackGreeting: "שָׁלוֹם טוֹמִי, אֵיזֶה כֵּיף שֶׁבָּאתָ.",
-  clickHelp: "אֲנִי אִתְּךָ. נַעֲשֶׂה אֶת זֶה בְּיַחַד.",
-  clickSuccess: "אֵיזֶה יוֹפִי טוֹמִי, הִצְלַחְתָּ!",
-  clickDifficulty: "זֶה בְּסֵדֶר שֶׁקָּשֶׁה. אֲנַחְנוּ מִתְקַדְּמִים צַעַד צַעַד.",
-  clickCorrect: "נָכוֹן מְאֹד, כָּל הַכָּבוֹד!",
-  clickWrong: "נִסָּיוֹן יָפֶה. בּוֹא נְנַסֶּה שׁוּב לְאַט.",
-  endingPrompt: "אֵיךְ הָיָה לְךָ הַיּוֹם?",
-  endingResponses: {
-    easy: "מְעֻלֶּה, אֲנִי גֵּאָה בְּךָ.",
-    ok: "יָפֶה מְאֹד, עָשִׂיתָ דֶּרֶךְ חֲשׁוּבָה.",
-    hard: "אֲנִי יוֹדַעַת שֶׁהָיָה קָשֶׁה, וַעֲדַיִן נִסִּיתָ. זֶה מְעֻלֶּה.",
-    fun: "אֵיזֶה כֵּיף! נַמְשִׁיךְ גַּם בַּפַּעַם הַבָּאָה.",
+const TEACHER = {
+  name: "לִיאוֹ",
+  opening: "שָׁלוֹם טוֹמִי, אֲנִי לִיאוֹ. אֲנִי אֶהְיֶה הַמּוֹרָה שֶׁלְּךָ הַיּוֹם.",
+  moodQuestion: "אֵיךְ אַתָּה מַרְגִּישׁ עַכְשָׁיו?",
+  moodResponse: {
+    happy: "אֵיזֶה יֹפִי! הַשִּׂמְחָה שֶׁלְּךָ מְמַלֵּאת אֶת הַכִּתָּה.",
+    tired: "תּוֹדָה שֶׁשִּׁתַּפְתָּ. נִלְמַד לְאַט וּבְנֹעַם.",
+    hard: "אֲנִי אִתְּךָ. נִתְקַדֵּם בְּיַחַד צַעַד אַחַר צַעַד.",
+    ready: "מְצוּיָן! אֲנַחְנוּ מוּכָנִים לְהַרְפַּתְקַת הַלְּמִידָה.",
   },
 };
 
@@ -117,7 +126,50 @@ const FALLBACK_LESSON = {
   ],
 };
 
-function getVoices() {
+function defaultSessionState() {
+  return {
+    lessonId: null,
+    startedAt: null,
+    timestamps: [],
+    moodAnswer: null,
+    completedExercises: [],
+    difficultExercises: [],
+    voiceReflectionsCount: 0,
+  };
+}
+
+let sessionState = defaultSessionState();
+
+function readSessionState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEYS.session);
+    if (!raw) return defaultSessionState();
+    return { ...defaultSessionState(), ...JSON.parse(raw) };
+  } catch (error) {
+    return defaultSessionState();
+  }
+}
+
+function addTimestamp(type, stepId = null) {
+  sessionState.timestamps.push({ type, stepId, at: new Date().toISOString() });
+}
+
+function saveSessionState() {
+  localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(sessionState));
+}
+
+function saveRecording(kind, stepId, base64Audio) {
+  const raw = localStorage.getItem(STORAGE_KEYS.recordings);
+  const recordings = raw ? JSON.parse(raw) : [];
+  recordings.push({ lessonId: lessonData?.id || "lesson-01", kind, stepId, timestamp: new Date().toISOString(), audioData: base64Audio });
+  localStorage.setItem(STORAGE_KEYS.recordings, JSON.stringify(recordings));
+}
+
+function currentStep() {
+  return lessonData.steps[currentStepIndex];
+}
+
+async function getVoices() {
   return new Promise((resolve) => {
     const voices = speechSynthesis.getVoices();
     if (voices.length) {
@@ -136,56 +188,9 @@ async function speak(text) {
   const hebrewVoice = voices.find((v) => v.lang?.toLowerCase().startsWith("he"));
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "he-IL";
-  if (hebrewVoice) utterance.voice = hebrewVoice;
   utterance.rate = 0.9;
-  utterance.pitch = 1;
+  if (hebrewVoice) utterance.voice = hebrewVoice;
   speechSynthesis.speak(utterance);
-}
-
-function getTimeGreeting() {
-  const hour = new Date().getHours();
-  if (hour >= 5 && hour < 12) {
-    return "בֹּקֶר טוֹב טוֹמִי, אֵיזֶה כֵּיף שֶׁבָּאתָ לִלְמֹד אִתִּי.";
-  }
-  if (hour >= 12 && hour < 18) {
-    return "צָהֳרַיִם טוֹבִים טוֹמִי, אֵיזֶה כֵּיף שֶׁבָּאתָ לִלְמֹד אִתִּי.";
-  }
-  if (hour >= 18 && hour <= 23) {
-    return "עֶרֶב טוֹב טוֹמִי, אֵיזֶה כֵּיף שֶׁבָּאתָ לִלְמֹד אִתִּי.";
-  }
-  return TEACHER_LINES.fallbackGreeting;
-}
-
-function readProgress() {
-  const raw = localStorage.getItem(STORAGE_KEYS.progress);
-  return raw ? JSON.parse(raw) : [];
-}
-
-function saveProgress(stepId, result) {
-  const progress = readProgress();
-  progress.push({
-    lessonId: lessonData.id,
-    stepId,
-    result,
-    recordingTimestamp: new Date().toISOString(),
-  });
-  localStorage.setItem(STORAGE_KEYS.progress, JSON.stringify(progress));
-}
-
-function readRecordings() {
-  const raw = localStorage.getItem(STORAGE_KEYS.recordings);
-  return raw ? JSON.parse(raw) : [];
-}
-
-function saveRecording(stepId, base64Audio) {
-  const recordings = readRecordings();
-  recordings.push({
-    lessonId: lessonData.id,
-    stepId,
-    timestamp: new Date().toISOString(),
-    audioData: base64Audio,
-  });
-  localStorage.setItem(STORAGE_KEYS.recordings, JSON.stringify(recordings));
 }
 
 function blobToDataURL(blob) {
@@ -197,28 +202,41 @@ function blobToDataURL(blob) {
   });
 }
 
-function currentStep() {
-  return lessonData.steps[currentStepIndex];
+function registerCompletedStep(stepId) {
+  if (!sessionState.completedExercises.includes(stepId)) {
+    sessionState.completedExercises.push(stepId);
+    addTimestamp("completed", stepId);
+    saveSessionState();
+    renderExerciseTracker();
+  }
 }
 
-function encouragement() {
-  const lines = [
-    "אֲנִי גֵּאָה בְּךָ טוֹמִי 🌟",
-    "אֵיזֶה יוֹפִי, מַמְשִׁיכִים לְאַט וּבְכֵיף 😊",
-    "כָּל נִסָּיוֹן עוֹזֵר לְךָ לִלְמֹד 💛",
-    "עֲבוֹדָה נֶהְדֶּרֶת, טוֹמִי!",
-  ];
-  return lines[Math.floor(Math.random() * lines.length)];
+function registerDifficultStep(stepId) {
+  if (!sessionState.difficultExercises.includes(stepId)) {
+    sessionState.difficultExercises.push(stepId);
+  }
+  addTimestamp("difficult", stepId);
+  saveSessionState();
+}
+
+function renderExerciseTracker() {
+  exerciseListEl.innerHTML = "";
+  lessonData.steps.forEach((step, index) => {
+    const item = document.createElement("div");
+    const isDone = sessionState.completedExercises.includes(step.id);
+    item.className = `exercise-item ${isDone ? "done" : ""}`;
+    item.innerHTML = `
+      <span class="exercise-index">${index + 1}</span>
+      <span class="exercise-name">${step.title}</span>
+      ${isDone ? '<span class="complete-badge">✓ הֻשְׁלַם</span>' : ""}
+    `;
+    exerciseListEl.appendChild(item);
+  });
 }
 
 function resetWorksheetState() {
   selectedSyllable = null;
   matchedItems = new Set();
-}
-
-function toggleLessonEnding(show) {
-  lessonEndingOpen = show;
-  lessonEndingEl.hidden = !show;
 }
 
 function renderWorksheet(step) {
@@ -251,17 +269,12 @@ function renderWorksheet(step) {
     pictureGridEl.appendChild(pictureCard);
   });
 
-  updateWorksheetProgress(step);
-}
-
-function updateWorksheetProgress(step) {
   worksheetProgressEl.textContent = `הַתְאָמָה: ${matchedItems.size}/${step.pairs.length}`;
 }
 
 function checkWorksheetMatch(step, pictureCard) {
   if (!selectedSyllable) {
     statusMessageEl.textContent = "בְּחַר קוֹדֶם כַּרְטִיס צְלִיל גָּדוֹל, וְאָז תְּמוּנָה.";
-    speak(TEACHER_LINES.clickWrong);
     return;
   }
 
@@ -269,23 +282,15 @@ function checkWorksheetMatch(step, pictureCard) {
   if (selectedSyllable === cardSyllable && !matchedItems.has(cardSyllable)) {
     matchedItems.add(cardSyllable);
     pictureCard.classList.add("matched");
-    document
-      .querySelector(`.syllable-card[data-syllable="${CSS.escape(cardSyllable)}"]`)
-      ?.classList.add("matched");
-    statusMessageEl.textContent = TEACHER_LINES.clickCorrect;
-    speak(TEACHER_LINES.clickCorrect);
-  } else if (matchedItems.has(cardSyllable)) {
-    statusMessageEl.textContent = "אֶת הַכַּרְטִיס הַזֶּה כְּבָר הִתְאַמְתָּ. נִבְחַר אַחֵר.";
-    speak(TEACHER_LINES.clickWrong);
+    document.querySelector(`.syllable-card[data-syllable="${CSS.escape(cardSyllable)}"]`)?.classList.add("matched");
+    statusMessageEl.textContent = "נָכוֹן מְאֹד, כָּל הַכָּבוֹד!";
   } else {
-    statusMessageEl.textContent = TEACHER_LINES.clickWrong;
-    speak(TEACHER_LINES.clickWrong);
+    statusMessageEl.textContent = "נִסָּיוֹן יָפֶה. בּוֹא נְנַסֶּה שׁוּב לְאַט.";
   }
 
-  updateWorksheetProgress(step);
-
+  worksheetProgressEl.textContent = `הַתְאָמָה: ${matchedItems.size}/${step.pairs.length}`;
   if (matchedItems.size === step.pairs.length) {
-    statusMessageEl.textContent = `${step.encouragement} אֶפְשָׁר לִלְחוֹץ "אֲנִי מוּכָן" לַשָּׁלָב הַבָּא.`;
+    statusMessageEl.textContent = `${step.encouragement} אֶפְשָׁר לַעֲבוֹר לַשָּׁלָב הַבָּא.`;
   }
 }
 
@@ -303,7 +308,6 @@ function updateStepUi() {
   stepCounterEl.textContent = `שָׁלָב ${currentStepIndex + 1} מִתּוֹךְ ${lessonData.steps.length}`;
   stepTitleEl.textContent = step.title;
   stepTextEl.textContent = step.text;
-  toggleLessonEnding(false);
 
   if (step.type === "worksheet" && step.pairs?.length) {
     resetWorksheetState();
@@ -332,136 +336,192 @@ function updateStepUi() {
   speak(step.voiceText || step.text);
 }
 
-function openLessonEndingFlow() {
-  toggleLessonEnding(true);
-  statusMessageEl.textContent = TEACHER_LINES.endingPrompt;
-  speak(TEACHER_LINES.endingPrompt);
-}
-
-function nextStep() {
+function goToNextStep() {
   if (currentStepIndex < lessonData.steps.length - 1) {
+    registerCompletedStep(currentStep().id);
     currentStepIndex += 1;
+    addTimestamp("step_opened", currentStep().id);
+    saveSessionState();
     updateStepUi();
-  } else {
-    stepCounterEl.textContent = `סִיַּמְתָּ ${lessonData.steps.length}/${lessonData.steps.length}`;
-    statusMessageEl.textContent = "סִיַּמְתָּ אֶת הַשִּׁעוּר. כָּל הַכָּבוֹד, טוֹמִי! 🎉";
-    openLessonEndingFlow();
+    return;
   }
+
+  registerCompletedStep(currentStep().id);
+  stepCounterEl.textContent = `סִיַּמְתָּ ${lessonData.steps.length}/${lessonData.steps.length}`;
+  const doneText = "כָּל הַכָּבוֹד, טוֹמִי! סִיַּמְתָּ אֶת כָּל הַתַּרְגִּילִים. 🎉";
+  statusMessageEl.textContent = doneText;
+  speak(doneText);
 }
 
-async function setupRecorder() {
+async function setupRecorder(kind) {
   if (!navigator.mediaDevices?.getUserMedia) {
-    statusMessageEl.textContent = "אֶפְשָׁר לְהַמְשִׁיךְ גַּם בְּלִי מִיקְרוֹפוֹן. נַמְשִׁיךְ בְּיַחַד.";
-    return;
+    const noMicText = "אֶפְשָׁר לְהַמְשִׁיךְ גַּם בְּלִי מִיקְרוֹפוֹן. נַמְשִׁיךְ בְּיַחַד.";
+    statusMessageEl.textContent = noMicText;
+    reflectionStatusEl.textContent = noMicText;
+    return null;
   }
 
   try {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    recorder = new MediaRecorder(stream);
+    const recorder = new MediaRecorder(stream);
 
     recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) recordingChunks.push(event.data);
+      if (event.data.size <= 0) return;
+      if (kind === "reflection") {
+        reflectionChunks.push(event.data);
+      } else {
+        lessonChunks.push(event.data);
+      }
     };
 
     recorder.onstop = async () => {
-      const blob = new Blob(recordingChunks, { type: "audio/webm" });
-      recordingChunks = [];
-      activeRecordingUrl = URL.createObjectURL(blob);
-      playRecordingBtn.disabled = false;
+      const chunks = kind === "reflection" ? reflectionChunks : lessonChunks;
+      const blob = new Blob(chunks, { type: "audio/webm" });
+      if (kind === "reflection") {
+        reflectionChunks = [];
+      } else {
+        lessonChunks = [];
+      }
+
+      if (kind === "lesson") {
+        activeRecordingUrl = URL.createObjectURL(blob);
+        playRecordingBtn.disabled = false;
+      }
 
       const dataUrl = await blobToDataURL(blob);
-      saveRecording(currentStep().id, dataUrl);
+      saveRecording(kind, kind === "lesson" ? currentStep().id : "voice-reflection", dataUrl);
 
-      statusMessageEl.textContent = "הַהַקְלָטָה נִשְׁמְרָה. אֶפְשָׁר לִלְחוֹץ עַל שְׁמַע אוֹתִי.";
+      if (kind === "reflection") {
+        sessionState.voiceReflectionsCount += 1;
+        addTimestamp("reflection_saved");
+        saveSessionState();
+        reflectionStatusEl.textContent = "הַתְּשׁוּבָה נִשְׁמְרָה בַּמַּכְשִׁיר. תּוֹדָה!";
+      } else {
+        statusMessageEl.textContent = "הַהַקְלָטָה נִשְׁמְרָה. אֶפְשָׁר לִלְחוֹץ עַל שְׁמַע אוֹתִי.";
+      }
     };
+
+    return recorder;
   } catch (error) {
-    statusMessageEl.textContent = "אֶפְשָׁר לְהַמְשִׁיךְ גַּם בְּלִי מִיקְרוֹפוֹן. נַמְשִׁיךְ בְּיַחַד.";
+    const noMicText = "אֶפְשָׁר לְהַמְשִׁיךְ גַּם בְּלִי מִיקְרוֹפוֹן. נַמְשִׁיךְ בְּיַחַד.";
+    statusMessageEl.textContent = noMicText;
+    reflectionStatusEl.textContent = noMicText;
+    return null;
   }
 }
 
-speakAgainBtn.addEventListener("click", () => {
-  const helpLine = TEACHER_LINES.clickHelp;
-  statusMessageEl.textContent = helpLine;
-  speak(helpLine);
+function startLessonUi() {
+  emotionFlowEl.hidden = true;
+  lessonProgressEl.hidden = false;
+  exerciseTrackerEl.hidden = false;
+  stepContainerEl.hidden = false;
+  lessonControlsEl.hidden = false;
+
+  currentStepIndex = 0;
+  addTimestamp("lesson_started", currentStep().id);
+  saveSessionState();
+  updateStepUi();
+}
+
+enterBtn.addEventListener("click", async () => {
+  entryScreenEl.hidden = true;
+  emotionFlowEl.hidden = false;
+
+  sessionState.startedAt = sessionState.startedAt || new Date().toISOString();
+  addTimestamp("entered");
+  saveSessionState();
+
+  await speak(TEACHER.opening);
+  statusMessageEl.textContent = TEACHER.opening;
+  await speak(TEACHER.moodQuestion);
 });
 
-readyBtn.addEventListener("click", () => {
-  if (lessonEndingOpen) return;
+document.querySelectorAll(".mood-btn").forEach((button) => {
+  button.addEventListener("click", () => {
+    const mood = button.dataset.mood;
+    sessionState.moodAnswer = mood;
+    addTimestamp("mood_selected");
+    saveSessionState();
 
-  if (!hasStartedLesson) {
-    hasStartedLesson = true;
-    updateStepUi();
+    const line = TEACHER.moodResponse[mood];
+    reflectionStatusEl.textContent = line;
+    speak(line);
+  });
+});
+
+startLessonBtn.addEventListener("click", () => {
+  if (!sessionState.moodAnswer) {
+    reflectionStatusEl.textContent = "בְּחַר רֶגֶשׁ קוֹדֶם, וְאָז נַתְחִיל לִלְמֹד.";
+    return;
+  }
+  startLessonUi();
+});
+
+reflectionRecordBtn.addEventListener("click", async () => {
+  if (!reflectionRecorder) {
+    reflectionRecorder = await setupRecorder("reflection");
+  }
+  if (!reflectionRecorder) return;
+
+  if (!isReflectionRecording) {
+    reflectionRecorder.start();
+    isReflectionRecording = true;
+    reflectionRecordBtn.textContent = "עֲצוֹר הַקְלָטָה";
+    reflectionStatusEl.textContent = "מַקְלִיטִים אֶת הַתְּשׁוּבָה…";
     return;
   }
 
-  statusMessageEl.textContent = encouragement();
-  nextStep();
+  reflectionRecorder.stop();
+  isReflectionRecording = false;
+  reflectionRecordBtn.textContent = "הַקְלֵט תְּשׁוּבָה";
+});
+
+speakAgainBtn.addEventListener("click", () => {
+  if (!lastSpokenText) return;
+  speak(lastSpokenText);
+});
+
+readyBtn.addEventListener("click", () => {
+  goToNextStep();
 });
 
 recordBtn.addEventListener("click", async () => {
-  if (lessonEndingOpen) return;
+  if (!lessonRecorder) {
+    lessonRecorder = await setupRecorder("lesson");
+  }
+  if (!lessonRecorder) return;
 
-  if (!recorder) await setupRecorder();
-  if (!recorder) return;
-
-  if (!isRecording) {
-    recorder.start();
-    isRecording = true;
+  if (!isLessonRecording) {
+    lessonRecorder.start();
+    isLessonRecording = true;
     recordBtn.textContent = "עֲצוֹר הַקְלָטָה";
     statusMessageEl.textContent = "אֲנִי מַקְלִיטָה אוֹתְךָ…";
-  } else {
-    recorder.stop();
-    isRecording = false;
-    recordBtn.textContent = "הַקְלֵט אוֹתִי";
+    return;
   }
+
+  lessonRecorder.stop();
+  isLessonRecording = false;
+  recordBtn.textContent = "הַקְלֵט אוֹתִי";
 });
 
 playRecordingBtn.addEventListener("click", () => {
   if (!activeRecordingUrl) return;
-  const audio = new Audio(activeRecordingUrl);
-  audio.play();
+  new Audio(activeRecordingUrl).play();
 });
 
 successBtn.addEventListener("click", () => {
-  if (!hasStartedLesson || !lessonData) return;
-  saveProgress(currentStep().id, "success");
-  statusMessageEl.textContent = TEACHER_LINES.clickSuccess;
-  speak(TEACHER_LINES.clickSuccess);
-  openLessonEndingFlow();
+  registerCompletedStep(currentStep().id);
+  const msg = "אֵיזֶה יוֹפִי טוֹמִי, הִצְלַחְתָּ!";
+  statusMessageEl.textContent = msg;
+  speak(msg);
 });
 
 hardBtn.addEventListener("click", () => {
-  if (!hasStartedLesson || !lessonData) return;
-  saveProgress(currentStep().id, "difficulty");
-  statusMessageEl.textContent = TEACHER_LINES.clickDifficulty;
-  speak(TEACHER_LINES.clickDifficulty);
+  registerDifficultStep(currentStep().id);
+  const msg = "זֶה בְּסֵדֶר שֶׁקָּשֶׁה. אֲנַחְנוּ מִתְקַדְּמִים צַעַד צַעַד.";
+  statusMessageEl.textContent = msg;
+  speak(msg);
 });
-
-lessonEndingEl.addEventListener("click", (event) => {
-  const button = event.target.closest(".ending-btn");
-  if (!button) return;
-
-  const feeling = button.dataset.feeling;
-  const response = TEACHER_LINES.endingResponses[feeling] || TEACHER_LINES.fallbackGreeting;
-  statusMessageEl.textContent = response;
-  speak(response);
-});
-
-function showWelcomeState() {
-  const greeting = getTimeGreeting();
-  lessonTitleEl.textContent = "בָּרוּךְ הַבָּא";
-  stepCounterEl.textContent = "לִפְנֵי שֶׁמַּתְחִילִים";
-  stepTitleEl.textContent = "שָׁלוֹם טוֹמִי";
-  stepTextEl.textContent = "הַמּוֹרָה תְּדַבֵּר עַכְשָׁיו. כְּשֶׁתִּהְיֶה מוּכָן, לְחַץ עַל \"אֲנִי מוּכָן\".";
-  choiceGridEl.hidden = true;
-  choiceGridEl.innerHTML = "";
-  hideWorksheet();
-  writingPromptEl.hidden = true;
-  playRecordingBtn.disabled = true;
-  statusMessageEl.textContent = greeting;
-  toggleLessonEnding(false);
-  speak(greeting);
-}
 
 async function loadLesson() {
   try {
@@ -475,7 +535,15 @@ async function loadLesson() {
 
 async function init() {
   lessonData = await loadLesson();
-  showWelcomeState();
+  sessionState = readSessionState();
+  sessionState.lessonId = lessonData.id;
+  saveSessionState();
+
+  lessonTitleEl.textContent = "מוּכָנִים לְהַתְחָלָה";
+  stepCounterEl.textContent = "";
+  stepTitleEl.textContent = "";
+  stepTextEl.textContent = "";
+  renderExerciseTracker();
 }
 
 init();
