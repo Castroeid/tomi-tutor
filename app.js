@@ -54,9 +54,9 @@ const NO_HEBREW_VOICE_WARNING = "בַּמַּכְשִׁיר הַזֶּה לֹא 
 const NO_MALE_HEBREW_VOICE_WARNING = "במכשיר הזה לא נמצא קול עברי גברי. אפשר להחליף קול בהגדרות המכשיר.";
 const NEXT_EXERCISE_LINE = "כָּל הַכָּבוֹד טוֹמִי, סִיַּמְתָּ אֶת הַתַּרְגִּיל.";
 const ALMOST_DONE_LINE = "כִּמְעַט סִיַּמְנוּ. נִשְׁאַרוּ עוֹד כַּמָּה כַּרְטִיסִים.";
-const INTERACTION_LINE = "יָפֶה, נַמְשִׁיךְ.";
 const CORRECT_LINE = "כָּל הַכָּבוֹד!";
 const WRONG_LINE = "לֹא נָכוֹן, נְנַסֶּה שׁוּב.";
+const SPEECH_FALLBACK_LINE = "לֹא שָׁמַעְתִּי. נַנְסֶּה שׁוּב?";
 
 let lessonData = { title: "", exercises: [] };
 let currentExerciseIndex = 0;
@@ -67,10 +67,7 @@ let writingDrafts = [];
 let lastSpokenText = "";
 let hasHebrewVoice = true;
 let hasMaleHebrewVoice = true;
-
-let preLessonRecorder = null;
-let preLessonChunks = [];
-let isPreLessonRecording = false;
+let recognitionInProgress = false;
 
 function getAiConversationHelper() {
   if (window.AIConversation && typeof window.AIConversation.createLeoReply === "function") {
@@ -85,7 +82,38 @@ function fallbackLeoReply(context) {
   return helper.createLeoReply(context);
 }
 
-async function askLeoAI(context) {
+function buildLeoPrompt(mode, recognizedText, exercise, learnerProgress) {
+  const exerciseTitle = exercise?.title || "לֹא נִבְחַר תַּרְגִּיל";
+  const completedCount = learnerProgress?.completedExercises?.length || 0;
+  const difficultCount = learnerProgress?.difficultExercises?.length || 0;
+  const emotionalHints =
+    "אם הילד אומר 'עייף' תגיב בעדינות ותציע הפסקה קצרה. " +
+    "אם הילד אומר 'קשה' פשט את המשימה בצעד קטן. " +
+    "אם הילד אומר 'לא רוצה' תעודד בעדינות וללא לחץ.";
+
+  return [
+    "אַתָּה לֵיאוֹ, מוֹרֶה עִבְרִית חַם לְיַלְדֵי כִּתָּה א׳.",
+    "תַּעֲנֶה רַק בְּעִבְרִית עִם נִקּוּד מָלֵא.",
+    "מִשְׁפָּטִים קְצָרִים. טוֹן רָגוּעַ וְיְלָדוּתִי.",
+    "אַל תִּשְׁתַּמֵּשׁ בְּתַבְנִית קְבוּעָה. תְּגוּבָה חַיֶּבֶת לְהִתְבַּסֵּס עַל מִלּוֹת הַיֶּלֶד.",
+    emotionalHints,
+    `הֶקְשֵׁר: ${mode}.`,
+    `תַּרְגִּיל נוֹכְחִי: ${exerciseTitle}.`,
+    `הִתְקַדְּמוּת: הֻשְׁלְמוּ ${completedCount}, מְאַתְגְּרִים ${difficultCount}.`,
+    `מִלִּים שֶׁהַיֶּלֶד אָמַר: "${recognizedText || "..." }".`,
+    "הַחְזֵר מִשְׁפָּט אוֹ שְׁנַיִם לְכָל הַיּוֹתֵר.",
+  ].join(" ");
+}
+
+async function askLeoAI(contextOrMode, recognizedText, exercise, learnerProgress) {
+  const context =
+    typeof contextOrMode === "object" && contextOrMode !== null
+      ? contextOrMode
+      : {
+          type: contextOrMode,
+          recognizedText,
+          message: buildLeoPrompt(contextOrMode, recognizedText, exercise, learnerProgress),
+        };
   try {
     const response = await fetch(`${AI_BACKEND_URL}/api/leo-chat`, {
       method: "POST",
@@ -114,6 +142,29 @@ async function askLeoAI(context) {
 async function setTalkStatusFromAi(context) {
   const reply = await askLeoAI(context);
   if (reply) elements.talkStatus.textContent = reply;
+}
+
+function startSpeechRecognition(onResult) {
+  const SpeechRecognitionApi = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognitionApi) {
+    throw new Error("Speech recognition is not supported");
+  }
+
+  const recognition = new SpeechRecognitionApi();
+  recognition.lang = "he-IL";
+  recognition.interimResults = false;
+  recognition.continuous = false;
+
+  recognition.onresult = (event) => {
+    const recognizedText = event?.results?.[0]?.[0]?.transcript?.trim() || "";
+    onResult(recognizedText);
+  };
+
+  recognition.onerror = () => onResult("");
+  recognition.onnomatch = () => onResult("");
+  recognition.start();
+
+  return recognition;
 }
 
 async function generateExercisesFromBackend(payload = {}) {
@@ -316,7 +367,7 @@ function renderLessonMenu() {
     card.addEventListener("click", () => {
       if (exercise.type === "future" || status === "locked" || status === "done") {
         elements.statusMessage.textContent = "מִשְׂחָק קָטָן בַּסּוֹף — בַּקָּרוֹב";
-        speak(INTERACTION_LINE);
+        speak("בּוֹא נַמְשִׁיךְ יַחַד.");
         return;
       }
       currentExerciseIndex = index;
@@ -343,7 +394,7 @@ function addClickFeedback(target) {
 }
 
 function leoReaction(type) {
-  const line = type === "correct" ? CORRECT_LINE : type === "wrong" ? WRONG_LINE : INTERACTION_LINE;
+  const line = type === "correct" ? CORRECT_LINE : type === "wrong" ? WRONG_LINE : "בּוֹא נַמְשִׁיךְ יַחַד.";
   elements.statusMessage.textContent = line;
   speak(line);
 }
@@ -600,10 +651,9 @@ function clearTestingData() {
   progress = defaultProgress();
   localStorage.removeItem(STORAGE_KEYS.progress);
   localStorage.removeItem(STORAGE_KEYS.recordings);
-  preLessonChunks = [];
-  isPreLessonRecording = false;
+  recognitionInProgress = false;
   if (elements.talkRecordBtn) {
-    elements.talkRecordBtn.textContent = "הַקְלֵט";
+    elements.talkRecordBtn.textContent = "🎤 תַּגִּיד לִי";
   }
 
   if (lessonData.exercises.length > 0) {
@@ -620,44 +670,35 @@ function clearTestingData() {
   renderParentPanel();
 }
 
-async function preparePreLessonRecorder() {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    elements.talkStatus.textContent = "אֵין מִיקְרוֹפוֹן זָמִין בַּמַּכְשִׁיר.";
-    return null;
-  }
+async function handleSpeechInput() {
+  if (recognitionInProgress) return;
+  recognitionInProgress = true;
+  elements.talkStatus.textContent = "מַקְשִׁיב...";
 
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const recorder = new MediaRecorder(stream);
+    startSpeechRecognition(async (recognizedText) => {
+      recognitionInProgress = false;
+      if (!recognizedText) {
+        elements.talkStatus.textContent = SPEECH_FALLBACK_LINE;
+        await speak(SPEECH_FALLBACK_LINE);
+        return;
+      }
 
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) preLessonChunks.push(event.data);
-    };
+      elements.talkStatus.textContent = `שָׁמַעְתִּי: ${recognizedText}`;
+      const reply = await askLeoAI("pre_lesson", recognizedText, currentExercise(), progress);
+      if (!reply) {
+        elements.talkStatus.textContent = SPEECH_FALLBACK_LINE;
+        await speak(SPEECH_FALLBACK_LINE);
+        return;
+      }
 
-    recorder.onstop = () => {
-      const blob = new Blob(preLessonChunks, { type: "audio/webm" });
-      const metadata = {
-        id: crypto.randomUUID(),
-        type: "pre-lesson",
-        createdAt: new Date().toISOString(),
-        size: blob.size,
-      };
-      progress.voiceReflections.push(metadata);
-      saveProgress();
-      saveRecordingMetadata(metadata);
-      preLessonChunks = [];
-      setTalkStatusFromAi({
-        type: "recording-saved",
-        recordingSize: blob.size,
-        completedExercises: progress.completedExercises.length,
-      });
-      renderParentPanel();
-    };
-
-    return recorder;
+      elements.talkStatus.textContent = reply;
+      await speak(reply);
+    });
   } catch {
-    elements.talkStatus.textContent = "לֹא הִצְלַחְנוּ לְהַפְעִיל אֶת הַמִּיקְרוֹפוֹן.";
-    return null;
+    recognitionInProgress = false;
+    elements.talkStatus.textContent = SPEECH_FALLBACK_LINE;
+    await speak(SPEECH_FALLBACK_LINE);
   }
 }
 
@@ -698,10 +739,7 @@ elements.enterBtn.addEventListener("click", async () => {
 elements.talkYesBtn.addEventListener("click", async () => {
   elements.preLesson.hidden = true;
   elements.talkPanel.hidden = false;
-  await setTalkStatusFromAi({
-    type: "conversation-start",
-    message: "התלמיד התחיל שיחה לפני שיעור קריאה. כתוב משפט קצר ומעודד בעברית.",
-  });
+  elements.talkStatus.textContent = "לַחַץ עַל הַכַּפָּתּוֹר וַאֲנִי אַקְשִׁיב.";
   await speak("מָה אַתָּה רוֹצֶה לְסַפֵּר לִי?");
 });
 
@@ -717,23 +755,7 @@ elements.toLessonBtn.addEventListener("click", () => {
   showLessonFlow();
 });
 
-elements.talkRecordBtn.addEventListener("click", async () => {
-  if (!preLessonRecorder) {
-    preLessonRecorder = await preparePreLessonRecorder();
-  }
-  if (!preLessonRecorder) return;
-
-  if (!isPreLessonRecording) {
-    preLessonRecorder.start();
-    isPreLessonRecording = true;
-    elements.talkRecordBtn.textContent = "עֲצוֹר הַקְלָטָה";
-    elements.talkStatus.textContent = "מַקְלִיטִים…";
-  } else {
-    preLessonRecorder.stop();
-    isPreLessonRecording = false;
-    elements.talkRecordBtn.textContent = "הַקְלֵט";
-  }
-});
+elements.talkRecordBtn.addEventListener("click", handleSpeechInput);
 
 elements.speakAgainBtn.addEventListener("click", () => speak(lastSpokenText));
 
