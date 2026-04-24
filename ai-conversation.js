@@ -18,6 +18,20 @@
   }
 
   function createLeoReply(context) {
+    const childText = String(context?.recognizedText || "").trim();
+    if (context?.type === "pre_lesson" && childText) {
+      if (childText.includes("עייף")) {
+        return "שָׁמַעְתִּי שֶׁאַתָּה עָיֵף. בּוֹא נִנְשֹׁם וְנָנוּחַ דַּקָּה.";
+      }
+      if (childText.includes("קשה")) {
+        return "זֶה בֶּאֱמֶת קָשֶׁה לִפְעָמִים. נַתְחִיל בְּצַעַד קָטָן יַחַד.";
+      }
+      if (childText.includes("לא רוצה")) {
+        return "זֶה בְּסֵדֶר לְהַרְגִּישׁ כָּךְ. נַעֲשֶׂה רַק נִסָּיוֹן קָטָן בְּיַחַד.";
+      }
+      return `תּוֹדָה שֶׁסִּפַּרְתָּ לִי: ${childText}. אֲנִי אִתְּךָ.`;
+    }
+
     if (context?.type === "recording-saved") {
       const sizeHint = context.recordingSize || 0;
       const line = pickByNumber(AFTER_RECORDING_LINES, sizeHint);
