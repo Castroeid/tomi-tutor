@@ -9,12 +9,12 @@
   <body>
     <main class="app-shell">
       <header class="top-card">
-        <h1>המורה של טוֹמִי</h1>
-        <p class="subtitle">לומדים לקרוא ולכתוב בצעדים קטנים ונעימים.</p>
+        <h1>הַמּוֹרָה שֶׁל טוֹמִי</h1>
+        <p class="subtitle">לוֹמְדִים לִקְרוֹא וְלִכְתּוֹב בִּצְעָדִים קְטַנִּים וּנְעִימִים.</p>
       </header>
 
       <section class="lesson-progress card" aria-live="polite">
-        <h2 id="lesson-title">טוען שיעור…</h2>
+        <h2 id="lesson-title">טוֹעֵן שִׁעוּר…</h2>
         <p id="step-counter"></p>
         <p id="status-message" class="status-message"></p>
       </section>
@@ -24,7 +24,7 @@
         <p id="step-text"></p>
 
         <section id="worksheet" class="worksheet" hidden>
-          <h4 id="worksheet-instruction">במה מתחילה כל מילה? נבחר יחד.</h4>
+          <h4 id="worksheet-instruction">בַּמָּה מַתְחִילָה כָּל מִלָּה? נִבְחַר יַחַד.</h4>
           <p id="worksheet-progress" class="worksheet-progress"></p>
           <div id="syllable-grid" class="syllable-grid"></div>
           <div id="picture-grid" class="picture-grid"></div>
@@ -33,22 +33,32 @@
         <div id="choice-grid" class="choice-grid" hidden></div>
 
         <div id="writing-prompt" class="writing-prompt" hidden>
-          <p>✍️ כתוב במחברת שלך, וכשתסיים תלחץ "הצלחתי".</p>
+          <p>✍️ כְּתוֹב בַּמַּחְבֶּרֶת שֶׁלְּךָ, וּכְשֶׁתְּסַיֵּם לְחַץ "הִצְלַחְתִּי".</p>
         </div>
+
+        <section id="lesson-ending" class="lesson-ending" hidden>
+          <h4>אֵיךְ הָיָה לְךָ הַיּוֹם?</h4>
+          <div class="ending-grid">
+            <button type="button" class="big-btn ending-btn" data-feeling="easy">קַל</button>
+            <button type="button" class="big-btn ending-btn" data-feeling="ok">בְּסֵדֶר</button>
+            <button type="button" class="big-btn ending-btn" data-feeling="hard">קָשֶׁה</button>
+            <button type="button" class="big-btn ending-btn" data-feeling="fun">כֵּיף</button>
+          </div>
+        </section>
       </section>
 
       <section class="controls card">
         <div class="button-row">
-          <button id="speak-again" class="big-btn">שמע שוב</button>
-          <button id="ready-btn" class="big-btn primary">אני מוכן</button>
+          <button id="speak-again" class="big-btn">שְׁמַע שׁוּב</button>
+          <button id="ready-btn" class="big-btn primary">אֲנִי מוּכָן</button>
         </div>
         <div class="button-row">
-          <button id="record-btn" class="big-btn">הקלט אותי</button>
-          <button id="play-recording-btn" class="big-btn" disabled>שמע אותי</button>
+          <button id="record-btn" class="big-btn">הַקְלֵט אוֹתִי</button>
+          <button id="play-recording-btn" class="big-btn" disabled>שְׁמַע אוֹתִי</button>
         </div>
         <div class="button-row">
-          <button id="success-btn" class="big-btn success">הצלחתי</button>
-          <button id="hard-btn" class="big-btn warning">היה לי קשה</button>
+          <button id="success-btn" class="big-btn success">הִצְלַחְתִּי</button>
+          <button id="hard-btn" class="big-btn warning">הָיָה לִי קָשֶׁה</button>
         </div>
       </section>
     </main>
