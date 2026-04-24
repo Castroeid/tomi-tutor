@@ -40,6 +40,8 @@ const elements = {
   parentContent: document.getElementById("parent-content"),
   parentProgressLabel: document.getElementById("parent-progress-label"),
   parentProgressFill: document.getElementById("parent-progress-fill"),
+  parentResetBtn: document.getElementById("parent-reset-btn"),
+  parentFeedback: document.getElementById("parent-feedback"),
 };
 
 const STORAGE_KEYS = {
@@ -47,7 +49,8 @@ const STORAGE_KEYS = {
   recordings: "tomiTutorRecordings",
 };
 
-const FALLBACK_VOICE_WARNING = "לא נמצא קול עברי במכשיר הזה.";
+const NO_HEBREW_VOICE_WARNING = "בַּמַּכְשִׁיר הַזֶּה לֹא נִמְצָא קוֹל עִבְרִי.";
+const NO_MALE_HEBREW_VOICE_WARNING = "במכשיר הזה לא נמצא קול עברי גברי. אפשר להחליף קול בהגדרות המכשיר.";
 const NEXT_EXERCISE_LINE = "כָּל הַכָּבוֹד טוֹמִי, סִיַּמְתָּ אֶת הַתַּרְגִּיל.";
 const ALMOST_DONE_LINE = "כִּמְעַט סִיַּמְנוּ. נִשְׁאַרוּ עוֹד כַּמָּה כַּרְטִיסִים.";
 const INTERACTION_LINE = "יָפֶה, נַמְשִׁיךְ.";
@@ -62,6 +65,7 @@ let currentChoiceItemIndex = 0;
 let writingDrafts = [];
 let lastSpokenText = "";
 let hasHebrewVoice = true;
+let hasMaleHebrewVoice = true;
 
 let preLessonRecorder = null;
 let preLessonChunks = [];
@@ -138,14 +142,23 @@ async function speak(text) {
   speechSynthesis.cancel();
   const voices = await getVoices();
   const hebrewVoices = voices.filter((voice) => voice.lang?.toLowerCase().startsWith("he"));
-  const hebrewVoice = hebrewVoices
+  const maleHebrewVoices = hebrewVoices.filter((voice) => isMaleVoice(voice));
+  const preferredVoicePool = maleHebrewVoices.length > 0 ? maleHebrewVoices : hebrewVoices;
+  const hebrewVoice = preferredVoicePool
     .slice()
     .sort((a, b) => scoreVoice(b) - scoreVoice(a))[0];
   hasHebrewVoice = Boolean(hebrewVoice);
+  hasMaleHebrewVoice = maleHebrewVoices.length > 0;
 
   if (!hasHebrewVoice) {
     elements.voiceWarning.hidden = false;
-    elements.voiceWarning.textContent = FALLBACK_VOICE_WARNING;
+    elements.voiceWarning.textContent = NO_HEBREW_VOICE_WARNING;
+  } else if (!hasMaleHebrewVoice) {
+    elements.voiceWarning.hidden = false;
+    elements.voiceWarning.textContent = NO_MALE_HEBREW_VOICE_WARNING;
+  } else {
+    elements.voiceWarning.hidden = true;
+    elements.voiceWarning.textContent = "";
   }
 
   const utterance = new SpeechSynthesisUtterance(text);
@@ -159,10 +172,15 @@ async function speak(text) {
 function scoreVoice(voice) {
   const name = (voice?.name || "").toLowerCase();
   let score = 0;
-  if (name.includes("male") || name.includes("man") || name.includes("guy") || name.includes("גבר")) score += 4;
+  if (isMaleVoice(voice)) score += 4;
   if (name.includes("carmit") || name.includes("female") || name.includes("woman")) score -= 2;
   if (voice?.localService) score += 1;
   return score;
+}
+
+function isMaleVoice(voice) {
+  const name = (voice?.name || "").toLowerCase();
+  return name.includes("male") || name.includes("man") || name.includes("guy") || name.includes("גבר");
 }
 
 function currentExercise() {
@@ -507,6 +525,30 @@ function renderParentPanel() {
   `;
 }
 
+function clearTestingData() {
+  progress = defaultProgress();
+  localStorage.removeItem(STORAGE_KEYS.progress);
+  localStorage.removeItem(STORAGE_KEYS.recordings);
+  preLessonChunks = [];
+  isPreLessonRecording = false;
+  if (elements.talkRecordBtn) {
+    elements.talkRecordBtn.textContent = "הַקְלֵט";
+  }
+
+  if (lessonData.exercises.length > 0) {
+    const firstPlayableExerciseIndex = lessonData.exercises.findIndex((exercise) => exercise.type !== "future");
+    currentExerciseIndex = firstPlayableExerciseIndex === -1 ? 0 : firstPlayableExerciseIndex;
+  } else {
+    currentExerciseIndex = 0;
+  }
+
+  renderLessonMenu();
+  if (!elements.exercisePanel.hidden) {
+    openExercise();
+  }
+  renderParentPanel();
+}
+
 async function preparePreLessonRecorder() {
   if (!navigator.mediaDevices?.getUserMedia) {
     elements.talkStatus.textContent = "אֵין מִיקְרוֹפוֹן זָמִין בַּמַּכְשִׁיר.";
@@ -645,7 +687,16 @@ elements.parentToggleBtn.addEventListener("click", () => {
   const isExpanded = elements.parentToggleBtn.getAttribute("aria-expanded") === "true";
   elements.parentToggleBtn.setAttribute("aria-expanded", String(!isExpanded));
   elements.parentContent.hidden = isExpanded;
-  leoReaction("interaction");
+});
+
+elements.parentResetBtn?.addEventListener("click", () => {
+  const shouldClear = window.confirm("לְאַשֵּׁר נִקּוּי נְתוּנֵי בְּדִיקָה?");
+  if (!shouldClear) {
+    elements.parentFeedback.textContent = "הַנִּקּוּי בֻּטַּל.";
+    return;
+  }
+  clearTestingData();
+  elements.parentFeedback.textContent = "נְתוּנֵי הַבְּדִיקָה נוּקּוּ.";
 });
 
 document.addEventListener("click", (event) => addClickFeedback(event.target), true);
