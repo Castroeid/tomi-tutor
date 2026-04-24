@@ -48,6 +48,7 @@ const STORAGE_KEYS = {
   progress: "tomiTutorProgress",
   recordings: "tomiTutorRecordings",
 };
+const AI_BACKEND_URL = "https://tomi-tutor.onrender.com";
 
 const NO_HEBREW_VOICE_WARNING = "בַּמַּכְשִׁיר הַזֶּה לֹא נִמְצָא קוֹל עִבְרִי.";
 const NO_MALE_HEBREW_VOICE_WARNING = "במכשיר הזה לא נמצא קול עברי גברי. אפשר להחליף קול בהגדרות המכשיר.";
@@ -78,10 +79,57 @@ function getAiConversationHelper() {
   return null;
 }
 
-function setTalkStatusFromAi(context) {
+function fallbackLeoReply(context) {
   const helper = getAiConversationHelper();
-  if (!helper) return;
-  elements.talkStatus.textContent = helper.createLeoReply(context);
+  if (!helper) return "";
+  return helper.createLeoReply(context);
+}
+
+async function askLeoAI(context) {
+  try {
+    const response = await fetch(`${AI_BACKEND_URL}/api/leo-chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        message:
+          context?.message ||
+          context?.prompt ||
+          "תן תגובה קצרה, חמה ומעודדת לתלמיד בכיתה א׳ לפני או אחרי תרגיל.",
+      }),
+    });
+
+    if (!response.ok) throw new Error(`Leo chat failed: ${response.status}`);
+
+    const data = await response.json();
+    if (typeof data?.reply === "string" && data.reply.trim().length > 0) {
+      return data.reply;
+    }
+  } catch (error) {
+    console.warn("askLeoAI falling back to local AIConversation:", error);
+  }
+
+  return fallbackLeoReply(context);
+}
+
+async function setTalkStatusFromAi(context) {
+  const reply = await askLeoAI(context);
+  if (reply) elements.talkStatus.textContent = reply;
+}
+
+async function generateExercisesFromBackend(payload = {}) {
+  try {
+    const response = await fetch(`${AI_BACKEND_URL}/api/generate-exercises`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) throw new Error(`Generate exercises failed: ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.warn("generateExercisesFromBackend failed, using offline lesson:", error);
+    return null;
+  }
 }
 
 function defaultProgress() {
@@ -591,6 +639,20 @@ async function preparePreLessonRecorder() {
 }
 
 async function loadLesson() {
+  const generated = await generateExercisesFromBackend({
+    topic: "Hebrew letter and syllable practice",
+    level: "grade-1",
+  });
+  const isCompatibleGeneratedLesson =
+    generated &&
+    typeof generated.title === "string" &&
+    Array.isArray(generated.exercises) &&
+    generated.exercises.every((exercise) => exercise?.id && exercise?.type);
+
+  if (isCompatibleGeneratedLesson) {
+    return generated;
+  }
+
   const response = await fetch("lessons/lesson-01.json");
   if (!response.ok) throw new Error("Could not load lesson");
   return response.json();
@@ -613,7 +675,10 @@ elements.enterBtn.addEventListener("click", async () => {
 elements.talkYesBtn.addEventListener("click", async () => {
   elements.preLesson.hidden = true;
   elements.talkPanel.hidden = false;
-  setTalkStatusFromAi({ type: "conversation-start" });
+  await setTalkStatusFromAi({
+    type: "conversation-start",
+    message: "התלמיד התחיל שיחה לפני שיעור קריאה. כתוב משפט קצר ומעודד בעברית.",
+  });
   await speak("מָה אַתָּה רוֹצֶה לְסַפֵּר לִי?");
 });
 
