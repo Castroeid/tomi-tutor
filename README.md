@@ -28,6 +28,7 @@
 
 ## חיבור AI בעתיד
 
-קיים קובץ placeholder: `ai/openai-placeholder.js`.
+קיים קובץ placeholder: `ai-conversation.js` לתגובות מקומיות בטוחות ללא רשת.
+בנוסף נשמר קובץ עתידי `ai/openai-placeholder.js` לחיבור backend proxy.
 בעתיד מומלץ לחבר שיחה מבוססת AI דרך backend proxy בלבד,
 ולא ישירות מה-frontend עם מפתח API.
