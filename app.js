@@ -57,6 +57,9 @@ const ALMOST_DONE_LINE = "כִּמְעַט סִיַּמְנוּ. נִשְׁאַ�
 const CORRECT_LINE = "כָּל הַכָּבוֹד!";
 const WRONG_LINE = "לֹא נָכוֹן, נְנַסֶּה שׁוּב.";
 const SPEECH_FALLBACK_LINE = "לֹא שָׁמַעְתִּי. נַנְסֶּה שׁוּב?";
+const LISTENING_LINE = "לִיאוֹ מַקְשִׁיב...";
+const RESISTANT_SOFT_CHOICE =
+  "אֲנִי מֵבִין. לֹא חַיָּבִים הַרְבֵּה. נַעֲשֶׂה רַק כַּרְטִיס אֶחָד אוֹ שֶׁתִּבְחַר מִשְׂחָק קָטָן?";
 
 let lessonData = { title: "", exercises: [] };
 let currentExerciseIndex = 0;
@@ -68,6 +71,13 @@ let lastSpokenText = "";
 let hasHebrewVoice = true;
 let hasMaleHebrewVoice = true;
 let recognitionInProgress = false;
+let activeMediaRecorder = null;
+let activeRecorderChunks = [];
+let silenceTimeoutId = null;
+let activeAudioContext = null;
+let activeAnalyser = null;
+let activeMediaStream = null;
+let offlineAudioMode = false;
 
 function getAiConversationHelper() {
   if (window.AIConversation && typeof window.AIConversation.createLeoReply === "function") {
@@ -78,7 +88,13 @@ function getAiConversationHelper() {
 
 function fallbackLeoReply(context) {
   const helper = getAiConversationHelper();
-  if (!helper) return "";
+  if (!helper) {
+    return {
+      reply: SPEECH_FALLBACK_LINE,
+      emotion: "unknown",
+      nextAction: "encourage",
+    };
+  }
   return helper.createLeoReply(context);
 }
 
@@ -119,6 +135,7 @@ async function askLeoAI(contextOrMode, recognizedText, exercise, learnerProgress
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        transcribedText: context?.recognizedText,
         message:
           context?.message ||
           context?.prompt ||
@@ -130,7 +147,11 @@ async function askLeoAI(contextOrMode, recognizedText, exercise, learnerProgress
 
     const data = await response.json();
     if (typeof data?.reply === "string" && data.reply.trim().length > 0) {
-      return data.reply;
+      return {
+        reply: data.reply,
+        emotion: data.emotion || "unknown",
+        nextAction: data.nextAction || "encourage",
+      };
     }
   } catch (error) {
     console.warn("askLeoAI falling back to local AIConversation:", error);
@@ -140,8 +161,8 @@ async function askLeoAI(contextOrMode, recognizedText, exercise, learnerProgress
 }
 
 async function setTalkStatusFromAi(context) {
-  const reply = await askLeoAI(context);
-  if (reply) elements.talkStatus.textContent = reply;
+  const aiResult = await askLeoAI(context);
+  if (aiResult?.reply) elements.talkStatus.textContent = aiResult.reply;
 }
 
 function startSpeechRecognition(onResult) {
@@ -169,16 +190,10 @@ function startSpeechRecognition(onResult) {
 
 async function generateExercisesFromBackend(payload = {}) {
   try {
-    const response = await fetch(`${AI_BACKEND_URL}/api/leo-chat`, {
+    const response = await fetch(`${AI_BACKEND_URL}/api/generate-exercises`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        task: "generate-exercises",
-        payload,
-        message:
-          "Generate a grade-1 Hebrew reading lesson as strict JSON with keys title and exercises. " +
-          "Each exercise must include id and type, with beginner-friendly content.",
-      }),
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) throw new Error(`Generate exercises failed: ${response.status}`);
@@ -186,17 +201,6 @@ async function generateExercisesFromBackend(payload = {}) {
 
     if (data && typeof data.title === "string" && Array.isArray(data.exercises)) {
       return data;
-    }
-
-    if (typeof data?.reply === "string") {
-      try {
-        const parsedReply = JSON.parse(data.reply);
-        if (parsedReply && typeof parsedReply.title === "string" && Array.isArray(parsedReply.exercises)) {
-          return parsedReply;
-        }
-      } catch (parseError) {
-        console.warn("generateExercisesFromBackend could not parse leo-chat reply JSON:", parseError);
-      }
     }
 
     return null;
@@ -627,6 +631,12 @@ function renderParentPanel() {
   const difficult = progress.difficultExercises.length;
   const recordings = getSavedRecordingsCount();
   const lastMood = progress.lastMood || "—";
+  const debugConversations = (progress.voiceReflections || [])
+    .slice(-3)
+    .reverse()
+    .map((entry) =>
+      `🧾 ${entry.transcribedText || "—"}<br>🤖 ${entry.aiReply || "—"}<br>➡ ${entry.nextAction || "—"}`
+    );
   const total = lessonData.exercises.filter((exercise) => exercise.type !== "future").length || 1;
   const completedPercent = Math.round((completed / total) * 100);
   const completedNames = lessonData.exercises
@@ -644,6 +654,7 @@ function renderParentPanel() {
     <li>תַּרְגִּילִים מְאַתְגְּרִים: ${difficult}<br>${difficultNames.join("<br>") || "—"}</li>
     <li>מַצָּב רוּחַ אַחֲרוֹן: ${lastMood}</li>
     <li>מִסְפַּר הַקְלָטוֹת שֶׁנִּשְׁמְרוּ: ${recordings}</li>
+    <li>לוֹג שִׂיחוֹת (לְהוֹרִים/דִּיבַּג):<br>${debugConversations.join("<br><br>") || "—"}</li>
   `;
 }
 
@@ -653,7 +664,7 @@ function clearTestingData() {
   localStorage.removeItem(STORAGE_KEYS.recordings);
   recognitionInProgress = false;
   if (elements.talkRecordBtn) {
-    elements.talkRecordBtn.textContent = "🎤 תַּגִּיד לִי";
+    elements.talkRecordBtn.textContent = "דַּבֵּר עוֹד";
   }
 
   if (lessonData.exercises.length > 0) {
@@ -671,32 +682,191 @@ function clearTestingData() {
 }
 
 async function handleSpeechInput() {
+  if (activeMediaRecorder && activeMediaRecorder.state === "recording") {
+    stopConversationRecording();
+    return;
+  }
+  await startConversationRecording();
+}
+
+async function transcribeAudioBlob(audioBlob) {
+  const form = new FormData();
+  form.append("audio", audioBlob, "tomi-recording.webm");
+  const response = await fetch(`${AI_BACKEND_URL}/api/transcribe`, {
+    method: "POST",
+    body: form,
+  });
+  if (!response.ok) throw new Error(`Transcribe failed: ${response.status}`);
+  const data = await response.json();
+  return String(data?.text || "").trim();
+}
+
+async function speakWithBackend(text) {
+  const response = await fetch(`${AI_BACKEND_URL}/api/leo-speech`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!response.ok) throw new Error(`leo-speech failed: ${response.status}`);
+  const audioBlob = await response.blob();
+  const audioUrl = URL.createObjectURL(audioBlob);
+  const audio = new Audio(audioUrl);
+  audio.onended = () => URL.revokeObjectURL(audioUrl);
+  await audio.play();
+}
+
+function setTalkRecordButton(isRecording) {
+  elements.talkRecordBtn.textContent = isRecording ? "סִיַּמְתִּי" : "דַּבֵּר עוֹד";
+}
+
+function clearRecorderInternals() {
+  if (silenceTimeoutId) {
+    clearTimeout(silenceTimeoutId);
+    silenceTimeoutId = null;
+  }
+  if (activeAudioContext) {
+    activeAudioContext.close();
+  }
+  activeAudioContext = null;
+  activeAnalyser = null;
+  if (activeMediaStream) {
+    activeMediaStream.getTracks().forEach((track) => track.stop());
+  }
+  activeMediaStream = null;
+}
+
+function stopConversationRecording() {
+  if (!activeMediaRecorder || activeMediaRecorder.state !== "recording") return;
+  activeMediaRecorder.stop();
+  clearRecorderInternals();
+}
+
+function monitorSilence() {
+  if (!activeAnalyser || !activeMediaRecorder || activeMediaRecorder.state !== "recording") return;
+  const sample = new Uint8Array(activeAnalyser.fftSize);
+  activeAnalyser.getByteTimeDomainData(sample);
+  let peak = 0;
+  for (const value of sample) {
+    peak = Math.max(peak, Math.abs(value - 128));
+  }
+  if (peak < 4) {
+    if (!silenceTimeoutId) {
+      silenceTimeoutId = setTimeout(() => {
+        stopConversationRecording();
+      }, 1400);
+    }
+  } else if (silenceTimeoutId) {
+    clearTimeout(silenceTimeoutId);
+    silenceTimeoutId = null;
+  }
+  requestAnimationFrame(monitorSilence);
+}
+
+async function startConversationRecording() {
+  if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    offlineAudioMode = true;
+    await startSpeechRecognitionFallback();
+    return;
+  }
+
+  try {
+    activeMediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    activeRecorderChunks = [];
+    const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
+    activeMediaRecorder = new MediaRecorder(activeMediaStream, mimeType ? { mimeType } : undefined);
+    activeMediaRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) {
+        activeRecorderChunks.push(event.data);
+      }
+    };
+    activeMediaRecorder.onstop = async () => {
+      const audioBlob = new Blob(activeRecorderChunks, { type: mimeType || "audio/webm" });
+      activeMediaRecorder = null;
+      setTalkRecordButton(false);
+      await processRecordedAudio(audioBlob);
+    };
+
+    activeAudioContext = new window.AudioContext();
+    const source = activeAudioContext.createMediaStreamSource(activeMediaStream);
+    activeAnalyser = activeAudioContext.createAnalyser();
+    activeAnalyser.fftSize = 256;
+    source.connect(activeAnalyser);
+
+    elements.talkStatus.textContent = LISTENING_LINE;
+    setTalkRecordButton(true);
+    activeMediaRecorder.start();
+    monitorSilence();
+  } catch (error) {
+    console.warn("startConversationRecording failed, switching to offline speech mode", error);
+    offlineAudioMode = true;
+    setTalkRecordButton(false);
+    clearRecorderInternals();
+    await startSpeechRecognitionFallback();
+  }
+}
+
+async function processRecordedAudio(audioBlob) {
+  try {
+    const recognizedText = await transcribeAudioBlob(audioBlob);
+    await processRecognizedSpeech(recognizedText);
+  } catch (error) {
+    console.warn("Recorded audio pipeline failed, switching to offline mode", error);
+    offlineAudioMode = true;
+    await startSpeechRecognitionFallback();
+  }
+}
+
+async function processRecognizedSpeech(recognizedText) {
+  if (!recognizedText) {
+    elements.talkStatus.textContent = SPEECH_FALLBACK_LINE;
+    await speak(SPEECH_FALLBACK_LINE);
+    return;
+  }
+
+  const aiResult = await askLeoAI({
+    type: "pre_lesson",
+    recognizedText,
+    message: buildLeoPrompt("pre_lesson", recognizedText, currentExercise(), progress),
+  });
+  const replyText = aiResult?.nextAction === "offer_choice" && aiResult?.emotion === "resistant"
+    ? RESISTANT_SOFT_CHOICE
+    : aiResult?.reply || SPEECH_FALLBACK_LINE;
+
+  progress.voiceReflections.push({
+    at: new Date().toISOString(),
+    transcribedText: recognizedText,
+    aiReply: replyText,
+    nextAction: aiResult?.nextAction || "encourage",
+    offline: offlineAudioMode,
+  });
+  saveProgress();
+  renderParentPanel();
+
+  elements.talkStatus.textContent = replyText;
+  try {
+    if (!offlineAudioMode) {
+      await speakWithBackend(replyText);
+      return;
+    }
+  } catch (error) {
+    console.warn("leo-speech failed, falling back to speechSynthesis", error);
+  }
+  await speak(replyText);
+}
+
+async function startSpeechRecognitionFallback() {
   if (recognitionInProgress) return;
   recognitionInProgress = true;
-  elements.talkStatus.textContent = "מַקְשִׁיב...";
+  elements.talkStatus.textContent = LISTENING_LINE;
 
   try {
     startSpeechRecognition(async (recognizedText) => {
       recognitionInProgress = false;
-      if (!recognizedText) {
-        elements.talkStatus.textContent = SPEECH_FALLBACK_LINE;
-        await speak(SPEECH_FALLBACK_LINE);
-        return;
-      }
-
-      elements.talkStatus.textContent = `שָׁמַעְתִּי: ${recognizedText}`;
-      const reply = await askLeoAI("pre_lesson", recognizedText, currentExercise(), progress);
-      if (!reply) {
-        elements.talkStatus.textContent = SPEECH_FALLBACK_LINE;
-        await speak(SPEECH_FALLBACK_LINE);
-        return;
-      }
-
-      elements.talkStatus.textContent = reply;
-      await speak(reply);
+      await processRecognizedSpeech(recognizedText);
     });
-  } catch {
+  } catch (error) {
     recognitionInProgress = false;
+    console.warn("Speech recognition fallback unavailable", error);
     elements.talkStatus.textContent = SPEECH_FALLBACK_LINE;
     await speak(SPEECH_FALLBACK_LINE);
   }
@@ -739,17 +909,20 @@ elements.enterBtn.addEventListener("click", async () => {
 elements.talkYesBtn.addEventListener("click", async () => {
   elements.preLesson.hidden = true;
   elements.talkPanel.hidden = false;
-  elements.talkStatus.textContent = "לַחַץ עַל הַכַּפָּתּוֹר וַאֲנִי אַקְשִׁיב.";
-  await speak("מָה אַתָּה רוֹצֶה לְסַפֵּר לִי?");
+  elements.talkStatus.textContent = LISTENING_LINE;
+  await speak("מְעוּלֶּה, אֲנִי מַקְשִׁיב.");
+  await startConversationRecording();
 });
 
 elements.talkNoBtn.addEventListener("click", () => {
+  stopConversationRecording();
   elements.preLesson.hidden = true;
   leoReaction("interaction");
   showLessonFlow();
 });
 
 elements.toLessonBtn.addEventListener("click", () => {
+  stopConversationRecording();
   elements.talkPanel.hidden = true;
   leoReaction("interaction");
   showLessonFlow();
@@ -830,6 +1003,7 @@ async function init() {
   progress = loadProgress();
   lessonData = await loadLesson();
   await setAvatar();
+  setTalkRecordButton(false);
 }
 
 init();
